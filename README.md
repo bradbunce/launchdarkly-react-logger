@@ -56,6 +56,7 @@ function App() {
     <LDProvider 
       createContexts={createContexts}
       onReady={() => console.log('LaunchDarkly initialized')}
+      loadingComponent={<div>Loading LaunchDarkly...</div>} // Optional custom loading component
     >
       <YourApp />
     </LDProvider>

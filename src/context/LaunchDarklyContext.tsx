@@ -6,18 +6,25 @@ import { LDProviderComponent } from '../types';
 interface LDProviderProps {
   children: React.ReactNode;
   onReady?: () => void;
-  createContexts: (user: any) => any; // Type this based on your context structure
+  createContexts: (user: any) => any;
   clientSideId?: string;
+  /** Component to display while LaunchDarkly is initializing. Defaults to an empty div */
+  loadingComponent?: React.ReactNode;
 }
 
 const LDContext = createContext<LDProviderComponent | null>(null);
 
-export const LDProvider: React.FC<LDProviderProps> = ({ 
-  children, 
-  onReady, 
+export const LDProvider: React.FC<LDProviderProps> = ({
+  children,
+  onReady,
   createContexts,
-  clientSideId = process.env.REACT_APP_LD_CLIENTSIDE_ID 
+  clientSideId = process.env.REACT_APP_LD_CLIENTSIDE_ID,
+  loadingComponent = <div />
 }) => {
+  if (!clientSideId) {
+    throw new Error('REACT_APP_LD_CLIENTSIDE_ID is required');
+  }
+
   const [LDClient, setLDClient] = useState<LDProviderComponent | null>(null);
   const initializationRef = useRef(false);
   const logger = useLogger();
@@ -45,7 +52,7 @@ export const LDProvider: React.FC<LDProviderProps> = ({
     initializeLDClient();
   }, [onReady, logger, createContexts, clientSideId]);
 
-  if (!LDClient) return <div />;
+  if (!LDClient) return loadingComponent;
 
   return (
     <LDContext.Provider value={LDClient}>
