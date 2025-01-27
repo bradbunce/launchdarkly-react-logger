@@ -9,6 +9,7 @@ A lightweight, type-safe logging utility for React applications using LaunchDark
 - Emoji-based log level visualization
 - Performance measurement utilities
 - Debug grouping support
+- Comprehensive test coverage
 
 ## Requirements
 - React ≥18.2.0
@@ -119,8 +120,41 @@ Log levels are controlled by your LaunchDarkly feature flag (REACT_APP_LD_CONSOL
 
 The flag value determines which levels are displayed. For example, setting the flag to 3 (INFO) will show FATAL, ERROR, WARN, and INFO logs, but suppress DEBUG and TRACE logs.
 
+## Development
+
+### Testing
+The project includes a comprehensive test suite that verifies:
+- Log level control through LaunchDarkly feature flags
+- All logging methods (fatal, error, warn, info, debug, trace)
+- Group and time logging functionality
+- Environment variable handling
+- React hook lifecycle
+
+To run tests:
+```bash
+npm test
+```
+
+To run tests in watch mode:
+```bash
+npm run test:watch
+```
+
+### Building
+To build the project:
+```bash
+npm run build
+```
+
+This will generate:
+- CommonJS build (dist/index.js)
+- ES Module build (dist/index.esm.js)
+- TypeScript declarations (dist/index.d.ts)
+
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first.
+
+Please ensure tests pass and add tests for any new features.
 
 ## License
 MIT
