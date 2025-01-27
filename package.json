@@ -1,7 +1,10 @@
 {
   "name": "@bradbunce/launchdarkly-react-logger",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "type": "module",
+  "engines": {
+    "node": ">=18.2.0"
+  },
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
