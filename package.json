@@ -1,6 +1,6 @@
 {
-  "name": "launchdarkly-react-logger",
-  "version": "1.0.3",
+  "name": "@bradbunce/launchdarkly-react-logger",
+  "version": "1.0.4",
   "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
