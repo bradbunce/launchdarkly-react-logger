@@ -17,7 +17,7 @@ A lightweight, type-safe logging utility for React applications using LaunchDark
 
 ## Installation
 ```bash
-npm install launchdarkly-react-logger
+npm install @bradbunce/launchdarkly-react-logger
 ```
 
 ## Setup
