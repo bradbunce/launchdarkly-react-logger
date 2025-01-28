@@ -1,16 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { asyncWithLDProvider } from 'launchdarkly-react-client-sdk';
-import { useLogger } from '../logger';
-import { LDProviderComponent } from '../types';
-
-interface LDProviderProps {
-  children: React.ReactNode;
-  onReady?: () => void;
-  createContexts: (user: any) => any;
-  clientSideId?: string;
-  /** Component to display while LaunchDarkly is initializing. Defaults to an empty div */
-  loadingComponent?: React.ReactNode;
-}
+import { LDProviderComponent, LDProviderProps } from '../types';
 
 const LDContext = createContext<LDProviderComponent | null>(null);
 
@@ -19,15 +9,12 @@ export const LDProvider: React.FC<LDProviderProps> = ({
   onReady,
   createContexts,
   clientSideId = process.env.REACT_APP_LD_CLIENTSIDE_ID,
+  existingClient,
   loadingComponent = <div />
 }) => {
-  if (!clientSideId) {
-    throw new Error('REACT_APP_LD_CLIENTSIDE_ID is required');
-  }
-
   const [LDClient, setLDClient] = useState<LDProviderComponent | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   const initializationRef = useRef(false);
-  const logger = useLogger();
 
   useEffect(() => {
     const initializeLDClient = async () => {
@@ -35,6 +22,22 @@ export const LDProvider: React.FC<LDProviderProps> = ({
       initializationRef.current = true;
 
       try {
+        // If an existing client is provided, use it
+        if (existingClient) {
+          setLDClient(() => existingClient);
+          onReady?.();
+          return;
+        }
+
+        // Validate required props
+        if (!clientSideId) {
+          throw new Error('clientSideId is required when not using an existing client');
+        }
+        if (!createContexts) {
+          throw new Error('createContexts is required when not using an existing client');
+        }
+
+        // Create a new client
         const initialContexts = createContexts(null);
         const LDProviderComponent = await asyncWithLDProvider({
           clientSideID: clientSideId,
@@ -45,13 +48,18 @@ export const LDProvider: React.FC<LDProviderProps> = ({
         setLDClient(() => LDProviderComponent);
         onReady?.();
       } catch (error) {
-        logger.error('Error initializing LaunchDarkly', { error: (error as Error).message });
+        if (error instanceof Error) {
+          setError(error);
+        } else {
+          setError(new Error('Unknown error initializing LaunchDarkly'));
+        }
       }
     };
 
     initializeLDClient();
-  }, [onReady, logger, createContexts, clientSideId]);
+  }, [onReady, createContexts, clientSideId, existingClient]);
 
+  if (error) throw error;
   if (!LDClient) return loadingComponent;
 
   return (

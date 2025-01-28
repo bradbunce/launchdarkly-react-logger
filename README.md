@@ -48,6 +48,38 @@ export const createContexts = (user: any) => ({
 ```
 
 ### 3. Provider Setup
+
+You can use the LDProvider in one of two ways:
+
+#### Option A: Using an existing LaunchDarkly client (Recommended)
+If your application already has a LaunchDarkly client set up, you can pass it to the LDProvider to avoid creating multiple instances:
+
+```typescript
+import { LDProvider } from 'launchdarkly-react-logger';
+import { withLDProvider } from 'launchdarkly-react-client-sdk';
+
+// Your existing LaunchDarkly client setup
+const LDClient = withLDProvider({
+  clientSideID: 'your-client-id',
+  context: yourContexts
+})(YourComponent);
+
+function App() {
+  return (
+    <LDProvider 
+      existingClient={LDClient}
+      onReady={() => console.log('LaunchDarkly logger initialized')}
+      loadingComponent={<div>Loading...</div>} // Optional custom loading component
+    >
+      <YourApp />
+    </LDProvider>
+  );
+}
+```
+
+#### Option B: Creating a new LaunchDarkly client
+If you don't have an existing LaunchDarkly client, the LDProvider can create one for you:
+
 ```typescript
 import { LDProvider } from 'launchdarkly-react-logger';
 import { createContexts } from './contexts';
@@ -55,7 +87,8 @@ import { createContexts } from './contexts';
 function App() {
   return (
     <LDProvider 
-      createContexts={createContexts}
+      clientSideId="your-client-id" // Required when not using existingClient
+      createContexts={createContexts} // Required when not using existingClient
       onReady={() => console.log('LaunchDarkly initialized')}
       loadingComponent={<div>Loading LaunchDarkly...</div>} // Optional custom loading component
     >
@@ -178,4 +211,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
-
