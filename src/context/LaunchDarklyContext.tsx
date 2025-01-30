@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { asyncWithLDProvider } from 'launchdarkly-react-client-sdk';
 import { LDProviderComponent, LDProviderProps } from '../types';
+import { logger } from '../logger';
 
 const LDContext = createContext<LDProviderComponent | null>(null);
 
@@ -43,6 +44,9 @@ export const LDProvider: React.FC<LDProviderProps> = ({
           clientSideID: clientSideId,
           context: initialContexts,
           timeout: 2,
+          options: {
+            logger: logger.createSdkLogger('info'),
+          },
         });
 
         setLDClient(() => LDProviderComponent);

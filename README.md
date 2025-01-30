@@ -31,13 +31,21 @@ REACT_APP_LD_CLIENTSIDE_ID=your-client-id
 
 # The feature flag key you created in LaunchDarkly for controlling console log levels
 REACT_APP_LD_CONSOLE_LOG_FLAG_KEY=your-flag-key
+
+# The feature flag key you created in LaunchDarkly for controlling SDK log levels
+REACT_APP_LD_SDK_LOG_FLAG_KEY=your-flag-key
 ```
 
 ### 2. LaunchDarkly Configuration
-1. Create a feature flag in LaunchDarkly with:
+1. Create a console logging feature flag in LaunchDarkly with:
    - Type: Number
    - Name: Your choice (use this as REACT_APP_LD_CONSOLE_LOG_FLAG_KEY)
    - Values: 0-5 corresponding to log levels (FATAL=0, ERROR=1, WARN=2, INFO=3, DEBUG=4, TRACE=5)
+
+2. Create an SDK logging feature flag in LaunchDarkly with:
+   - Type: String
+   - Name: Your choice (use this as REACT_APP_LD_SDK_LOG_FLAG_KEY)
+   - Values: 'error', 'warn', 'info', 'debug' (these control the LaunchDarkly SDK's internal logging)
 
 2. Create your contexts configuration:
 ```typescript

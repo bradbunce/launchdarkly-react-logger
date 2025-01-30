@@ -2,7 +2,8 @@ import React from 'react';
 import { render, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { LDProvider } from '../LaunchDarklyContext';
-import { asyncWithLDProvider, useLDClient } from 'launchdarkly-react-client-sdk';
+import { asyncWithLDProvider, useLDClient, basicLogger } from 'launchdarkly-react-client-sdk';
+import { logger } from '../../logger';
 
 // Mock the LaunchDarkly SDK
 jest.mock('launchdarkly-react-client-sdk', () => ({
@@ -13,9 +14,22 @@ jest.mock('launchdarkly-react-client-sdk', () => ({
 // Mock the logger to avoid actual logging during tests
 jest.mock('../../logger', () => ({
   useLogger: jest.fn(),
+  logger: {
+    createSdkLogger: jest.fn().mockReturnValue({ level: 'info' }),
+  },
 }));
 
 describe('LDProvider', () => {
+  // Suppress expected React error messages in tests
+  const originalError = console.error;
+  beforeAll(() => {
+    console.error = jest.fn();
+  });
+
+  afterAll(() => {
+    console.error = originalError;
+  });
+
   const MockComponent = ({ children }: { children: React.ReactNode }) => <>{children}</>;
   const mockExistingClient = jest.fn().mockImplementation(MockComponent);
   const mockCreateContexts = () => ({ user: 'test-user' });
@@ -65,7 +79,11 @@ describe('LDProvider', () => {
           clientSideID: 'test-client-id',
           context: { user: 'test-user' },
           timeout: 2,
+          options: {
+            logger: { level: 'info' },
+          },
         });
+        expect(logger.createSdkLogger).toHaveBeenCalled();
       });
     });
 

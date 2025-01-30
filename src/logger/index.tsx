@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { LDClient, useLDClient } from 'launchdarkly-react-client-sdk';
+import { LDClient, useLDClient, basicLogger, LDLogLevel } from 'launchdarkly-react-client-sdk';
 
 /**
  * Enum representing available log levels in order of severity.
@@ -26,7 +26,8 @@ export enum LogLevel {
  */
 export class Logger {
   private ldClient: LDClient | null = null;
-  private readonly FLAG_KEY = process.env.REACT_APP_LD_CONSOLE_LOG_FLAG_KEY;
+  private readonly CONSOLE_LOG_FLAG_KEY = process.env.REACT_APP_LD_CONSOLE_LOG_FLAG_KEY;
+  private readonly SDK_LOG_FLAG_KEY = process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY;
 
   /**
    * Sets the LaunchDarkly client instance for feature flag evaluation
@@ -37,15 +38,44 @@ export class Logger {
   }
 
   /**
-   * Gets the current log level from LaunchDarkly feature flag
+   * Gets the current console log level from LaunchDarkly feature flag
    * @returns Current LogLevel value
    * @throws Error if REACT_APP_LD_CONSOLE_LOG_FLAG_KEY is not set
    */
   private getCurrentLogLevel(): LogLevel {
-    if (!this.FLAG_KEY) {
+    if (!this.CONSOLE_LOG_FLAG_KEY) {
       throw new Error('REACT_APP_LD_CONSOLE_LOG_FLAG_KEY environment variable is not set');
     }
-    return this.ldClient?.variation(this.FLAG_KEY, LogLevel.ERROR) ?? LogLevel.ERROR;
+    return this.ldClient?.variation(this.CONSOLE_LOG_FLAG_KEY, LogLevel.ERROR) ?? LogLevel.ERROR;
+  }
+
+  /**
+   * Gets the current SDK log level from LaunchDarkly feature flag
+   * @param fallback - Fallback log level if flag returns null
+   * @returns Current SDK log level
+   * @throws Error if no fallback value is provided and flag returns null
+   */
+  getSdkLogLevel(fallback: LDLogLevel): LDLogLevel {
+    if (!this.SDK_LOG_FLAG_KEY) {
+      throw new Error('REACT_APP_LD_SDK_LOG_FLAG_KEY environment variable is not set');
+    }
+    if (!this.ldClient) {
+      throw new Error('LaunchDarkly client is not initialized');
+    }
+    const level = this.ldClient.variation(this.SDK_LOG_FLAG_KEY, fallback);
+    if (level === null && !fallback) {
+      throw new Error('SDK log level flag returned null and no fallback was provided');
+    }
+    return level ?? fallback;
+  }
+
+  /**
+   * Creates a LaunchDarkly logger instance based on the current SDK log level
+   * @param fallback - Fallback log level if flag returns null
+   * @returns LaunchDarkly logger instance
+   */
+  createSdkLogger(fallback: LDLogLevel) {
+    return basicLogger({ level: this.getSdkLogLevel(fallback) });
   }
 
   /**
