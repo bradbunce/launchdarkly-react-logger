@@ -161,6 +161,19 @@ Log levels are controlled by your LaunchDarkly feature flag (REACT_APP_LD_CONSOL
 
 The flag value determines which levels are displayed. For example, setting the flag to 3 (INFO) will show FATAL, ERROR, WARN, and INFO logs, but suppress DEBUG and TRACE logs.
 
+## SDK Logging
+The utility also provides runtime control over the LaunchDarkly SDK's internal logging through a feature flag (REACT_APP_LD_SDK_LOG_FLAG_KEY). This allows you to dynamically adjust the SDK's logging verbosity without redeploying your application.
+
+The SDK logger is automatically configured when the LDProvider initializes, using the log level specified by your feature flag. If the flag returns null or is not set, it will use 'info' as the default level.
+
+Available SDK log levels:
+- 'error' - Only log errors
+- 'warn' - Log warnings and errors
+- 'info' - Log general information, warnings, and errors
+- 'debug' - Log debug information and all above levels
+
+For example, you can temporarily enable debug logging in production to troubleshoot SDK-related issues by updating the feature flag value to 'debug'.
+
 ## Development
 
 ### Testing
