@@ -174,15 +174,18 @@ The two feature flags serve different purposes and are evaluated differently:
    - Used to control the visibility of console.log, console.error, etc. messages
 
 2. SDK Log Level Flag (REACT_APP_LD_SDK_LOG_FLAG_KEY):
-   - Evaluated in both Option A (existing client) and Option B (new client):
-     * Initial evaluation during initialization to configure the client's logger
-     * Subsequent evaluations when flag targeting rules change
+   - Client initialization:
+     * LaunchDarkly client always starts with built-in 'info' level
+     * We cannot evaluate any flags until the client is ready
+   - After client is ready (both Option A and B):
+     * SDK log level flag is evaluated with 'info' as fallback
      * All evaluations (valid and invalid) are tracked in LaunchDarkly analytics
      * All evaluations (valid and invalid) trigger onLogLevelChange callback
      * Only valid levels ('error', 'warn', 'info', 'debug') are stored in localStorage
    - Controls the verbosity of LaunchDarkly SDK's own logging (not your application's logging)
    - Changes to this flag will affect what SDK operations are logged (e.g., flag evaluations, network requests)
    - Invalid log levels are ignored for configuration but still tracked for analytics
+   - Note: In Option B, even though we evaluate the flag after client is ready, we can't change the client's logger configuration since it's set during initialization
 
 Available SDK log levels:
 - 'error' - Only log errors

@@ -13,6 +13,13 @@ const MockComponent: LDProviderComponent = function MockComponent(props) {
   return React.createElement(React.Fragment, null, props.children);
 };
 
+const getStoredLogLevel = (): LDLogLevel => {
+  const storedLogLevel = localStorage.getItem('ld_sdk_log_level');
+  return (storedLogLevel && ['error', 'warn', 'info', 'debug'].includes(storedLogLevel)) 
+    ? storedLogLevel as LDLogLevel 
+    : 'info';
+};
+
 export const LDProvider = ({
   children,
   onReady,
@@ -38,13 +45,8 @@ export const LDProvider = ({
           // Set up flag listener for the existing client
           if (process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY && (existingClient as any)._client) {
             const ldClient = (existingClient as any)._client as LDClient;
-            // Get initial log level
-            const storedLogLevel = localStorage.getItem('ld_sdk_log_level');
-            const logLevel: LDLogLevel = (storedLogLevel && ['error', 'warn', 'info', 'debug'].includes(storedLogLevel)) 
-              ? storedLogLevel as LDLogLevel 
-              : 'info';
-            // Evaluate the flag to track the evaluation
-            const currentLevel = ldClient.variation(process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY, logLevel);
+            // Evaluate the flag after client is ready
+            const currentLevel = ldClient.variation(process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY, 'info');
             // Always notify of the evaluation
             onLogLevelChange?.(currentLevel);
             // Only store valid levels
@@ -73,20 +75,14 @@ export const LDProvider = ({
           throw new Error('createContexts is required when not using an existing client');
         }
 
-        // Get stored log level or default to 'info'
-        const storedLogLevel = localStorage.getItem('ld_sdk_log_level');
-        const logLevel: LDLogLevel = (storedLogLevel && ['error', 'warn', 'info', 'debug'].includes(storedLogLevel)) 
-          ? storedLogLevel as LDLogLevel 
-          : 'info';
-
-        // Create a new client
+        // Create a new client with stored or default level
         const initialContexts = createContexts(null);
         const LDProviderComponent = await asyncWithLDProvider({
           clientSideID: clientSideId,
           context: initialContexts,
           timeout: 2,
           options: {
-            logger: basicLogger({ level: logLevel }),
+            logger: basicLogger({ level: getStoredLogLevel() }),
             bootstrap: 'localStorage'
           }
         });
@@ -94,8 +90,8 @@ export const LDProvider = ({
         // Set up flag listener after client is initialized
         if (process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY && (LDProviderComponent as any)._client) {
           const ldClient = (LDProviderComponent as any)._client as LDClient;
-          // Evaluate the flag to track the evaluation
-          const currentLevel = ldClient.variation(process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY, logLevel);
+          // Evaluate the flag after client is ready
+          const currentLevel = ldClient.variation(process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY, 'info');
           // Always notify of the evaluation
           onLogLevelChange?.(currentLevel);
           // Only store valid levels
