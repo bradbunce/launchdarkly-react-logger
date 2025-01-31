@@ -60,7 +60,7 @@ export const createContexts = (user: any) => ({
 You can use the LDProvider in one of two ways:
 
 #### Option A: Using an existing LaunchDarkly client (Recommended)
-If your application already has a LaunchDarkly client set up, you can pass it to the LDProvider to avoid creating multiple instances:
+If your application already has a LaunchDarkly client set up, you can pass it to the LDProvider to avoid creating multiple instances. This is the recommended approach as it ensures all flag evaluations are properly tracked through a single client instance, providing accurate analytics in your LaunchDarkly dashboard:
 
 ```typescript
 import { LDProvider } from 'launchdarkly-react-logger';
@@ -165,6 +165,8 @@ The flag value determines which levels are displayed. For example, setting the f
 The utility also provides runtime control over the LaunchDarkly SDK's internal logging through a feature flag (REACT_APP_LD_SDK_LOG_FLAG_KEY). This allows you to dynamically adjust the SDK's logging verbosity without redeploying your application.
 
 The SDK logger is automatically configured when the LDProvider initializes, using the log level specified by your feature flag. If the flag returns null or is not set, it will use 'info' as the default level.
+
+Note: When using an existing client (Option A), that client handles all flag evaluations and sends the events back to LaunchDarkly. This utility simply consumes the client through React context and does not modify or interfere with the client's event reporting. If you create a new client (Option B), that client will handle its own flag evaluations and event reporting.
 
 Available SDK log levels:
 - 'error' - Only log errors
