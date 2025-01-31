@@ -183,6 +183,11 @@ The project includes a comprehensive test suite that verifies:
 - Group and time logging functionality
 - Environment variable handling
 - React hook lifecycle
+- SDK log level handling:
+  - Default log level behavior
+  - Local storage persistence
+  - Dynamic updates through feature flags
+  - Invalid log level handling
 
 To run tests:
 ```bash
