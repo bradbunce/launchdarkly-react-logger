@@ -35,6 +35,32 @@ export const LDProvider = ({
         // If an existing client is provided, use it
         if (existingClient) {
           setClient(() => existingClient);
+          // Set up flag listener for the existing client
+          if (process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY && (existingClient as any)._client) {
+            const ldClient = (existingClient as any)._client as LDClient;
+            // Get initial log level
+            const storedLogLevel = localStorage.getItem('ld_sdk_log_level');
+            const logLevel: LDLogLevel = (storedLogLevel && ['error', 'warn', 'info', 'debug'].includes(storedLogLevel)) 
+              ? storedLogLevel as LDLogLevel 
+              : 'info';
+            // Evaluate the flag to track the evaluation
+            const currentLevel = ldClient.variation(process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY, logLevel);
+            // Always notify of the evaluation
+            onLogLevelChange?.(currentLevel);
+            // Only store valid levels
+            if (currentLevel && ['error', 'warn', 'info', 'debug'].includes(currentLevel)) {
+              localStorage.setItem('ld_sdk_log_level', currentLevel);
+            }
+            // Listen for changes
+            ldClient.on(`change:${process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY}`, (value: LDLogLevel) => {
+              // Always notify of the change
+              onLogLevelChange?.(value);
+              // Only store valid levels
+              if (['error', 'warn', 'info', 'debug'].includes(value)) {
+                localStorage.setItem('ld_sdk_log_level', value);
+              }
+            });
+          }
           onReady?.();
           return;
         }
@@ -68,11 +94,19 @@ export const LDProvider = ({
         // Set up flag listener after client is initialized
         if (process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY && (LDProviderComponent as any)._client) {
           const ldClient = (LDProviderComponent as any)._client as LDClient;
+          // Evaluate the flag to track the evaluation
+          const currentLevel = ldClient.variation(process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY, logLevel);
+          // Always notify of the evaluation
+          onLogLevelChange?.(currentLevel);
+          // Only store valid levels
+          if (currentLevel && ['error', 'warn', 'info', 'debug'].includes(currentLevel)) {
+            localStorage.setItem('ld_sdk_log_level', currentLevel);
+          }
+          // Listen for changes
           ldClient.on(`change:${process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY}`, (value: LDLogLevel) => {
-            // Always notify parent of the change
+            // Always notify of the change
             onLogLevelChange?.(value);
-            
-            // Only store if it's a valid log level
+            // Only store valid levels
             if (['error', 'warn', 'info', 'debug'].includes(value)) {
               localStorage.setItem('ld_sdk_log_level', value);
             }
@@ -95,13 +129,13 @@ export const LDProvider = ({
 
   if (error) throw error;
   if (client === MockComponent) {
-    return React.createElement(React.Fragment, null, loadingComponent);
+    return loadingComponent;
   }
 
   return React.createElement(
     LDContext.Provider,
     { value: client },
-    React.createElement(client, { children })
+    React.createElement(client, null, children)
   );
 };
 

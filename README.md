@@ -166,7 +166,23 @@ The utility also provides runtime control over the LaunchDarkly SDK's internal l
 
 The SDK logger is automatically configured when the LDProvider initializes, using the log level specified by your feature flag. If the flag returns null or is not set, it will use 'info' as the default level.
 
-Note: When using an existing client (Option A), that client handles all flag evaluations and sends the events back to LaunchDarkly. This utility simply consumes the client through React context and does not modify or interfere with the client's event reporting. If you create a new client (Option B), that client will handle its own flag evaluations and event reporting.
+The two feature flags serve different purposes and are evaluated differently:
+
+1. Console Log Level Flag (REACT_APP_LD_CONSOLE_LOG_FLAG_KEY):
+   - Evaluated on every log call to determine if the message should be displayed
+   - Each evaluation is sent back to LaunchDarkly through the client (your existing client in Option A, or the new client in Option B)
+   - Used to control the visibility of console.log, console.error, etc. messages
+
+2. SDK Log Level Flag (REACT_APP_LD_SDK_LOG_FLAG_KEY):
+   - Evaluated in both Option A (existing client) and Option B (new client):
+     * Initial evaluation during initialization to configure the client's logger
+     * Subsequent evaluations when flag targeting rules change
+     * All evaluations (valid and invalid) are tracked in LaunchDarkly analytics
+     * All evaluations (valid and invalid) trigger onLogLevelChange callback
+     * Only valid levels ('error', 'warn', 'info', 'debug') are stored in localStorage
+   - Controls the verbosity of LaunchDarkly SDK's own logging (not your application's logging)
+   - Changes to this flag will affect what SDK operations are logged (e.g., flag evaluations, network requests)
+   - Invalid log levels are ignored for configuration but still tracked for analytics
 
 Available SDK log levels:
 - 'error' - Only log errors
