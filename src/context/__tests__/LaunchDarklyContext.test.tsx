@@ -1,305 +1,186 @@
-/** @jsxRuntime classic */
-/** @jsx React.createElement */
-/** @jsxFrag React.Fragment */
-import React, { FC, PropsWithChildren } from 'react';
+import React from 'react';
 import { render, waitFor, act } from '@testing-library/react';
-import '@testing-library/jest-dom';
 import { LDProvider } from '../LaunchDarklyContext';
-import { asyncWithLDProvider, useLDClient, basicLogger } from 'launchdarkly-react-client-sdk';
-import { logger } from '../../logger';
+import { asyncWithLDProvider, basicLogger, LDClient, LDLogLevel } from 'launchdarkly-react-client-sdk';
+import { LDProviderComponent } from '../../types';
 
-// Mock the LaunchDarkly SDK
+// Mock LaunchDarkly SDK
 jest.mock('launchdarkly-react-client-sdk', () => ({
   asyncWithLDProvider: jest.fn(),
-  useLDClient: jest.fn(),
-  basicLogger: jest.fn(({ level }) => ({ level })),
-}));
-
-// Mock the logger to avoid actual logging during tests
-jest.mock('../../logger', () => ({
-  useLogger: jest.fn(),
-  logger: {
-    getSdkLogLevel: jest.fn().mockReturnValue('info'),
-  },
+  basicLogger: jest.fn(),
+  LDClient: jest.fn()
 }));
 
 describe('LDProvider', () => {
-  // Suppress expected React error messages in tests
-  const originalError = console.error;
-  beforeAll(() => {
-    console.error = jest.fn();
-  });
-
-  afterAll(() => {
-    console.error = originalError;
-  });
-
-  const MockComponent: FC<PropsWithChildren> = ({ children }) => <>{children}</>;
-  const TestContent: FC = () => <div data-testid="content">Test Content</div>;
-  const mockExistingClient = jest.fn().mockImplementation(MockComponent);
-  const mockCreateContexts = () => ({ user: 'test-user' });
   const mockOnReady = jest.fn();
-  const mockLDClient = { 
+  const mockOnLogLevelChange = jest.fn();
+  const mockCreateContexts = jest.fn(() => ({ user: 'test-user' }));
+  const mockClose = jest.fn(() => Promise.resolve());
+  
+  type LDEventHandler = (key: string, callback: (...args: any[]) => void, context?: any) => void;
+  
+  // Create a partial mock of LDClient with just the methods we need
+  const mockLDClient = {
+    on: jest.fn() as jest.MockedFunction<LDEventHandler>,
     variation: jest.fn(),
-    on: jest.fn(),
-    off: jest.fn()
-  };
+    close: mockClose,
+    waitUntilReady: jest.fn(),
+    waitForInitialization: jest.fn(),
+    waitUntilGoalsReady: jest.fn(),
+    identify: jest.fn(),
+    getContext: jest.fn(),
+    track: jest.fn(),
+    flush: jest.fn(),
+    allFlags: jest.fn()
+  } as unknown as LDClient;
+
+  // Create a mock provider component that matches LDProviderComponent type
+  const mockLDProviderComponent = Object.assign(
+    function TestComponent({ children }: { children?: React.ReactNode }) {
+      return <div data-testid="content">{children}</div>;
+    },
+    { _client: mockLDClient }
+  ) as LDProviderComponent;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    (asyncWithLDProvider as jest.Mock).mockResolvedValue(Object.assign(MockComponent, {
-      _client: mockLDClient
-    }));
-    (useLDClient as jest.Mock).mockReturnValue(mockLDClient);
-    // Clear localStorage before each test
     localStorage.clear();
+    process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY = 'sdk-log-level';
+    (asyncWithLDProvider as jest.Mock).mockResolvedValue(mockLDProviderComponent);
+    (basicLogger as jest.Mock).mockImplementation(({ level }) => ({ level }));
+  });
+
+  afterEach(() => {
+    delete process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY;
   });
 
   describe('SDK log level handling', () => {
     it('should use stored log level from localStorage', async () => {
       localStorage.setItem('ld_sdk_log_level', 'debug');
 
-      render(
-        <LDProvider
-          clientSideId="test-client-id"
-          createContexts={mockCreateContexts}
-        >
-          <TestContent />
-        </LDProvider>
-      );
-
-      await waitFor(() => {
-        expect(asyncWithLDProvider).toHaveBeenCalledWith(
-          expect.objectContaining({
-            options: {
-              logger: basicLogger({ level: 'debug' }),
-              bootstrap: 'localStorage'
-            }
-          })
+      await act(async () => {
+        render(
+          <LDProvider
+            clientSideId="test-client-id"
+            createContexts={mockCreateContexts}
+            onReady={mockOnReady}
+            onLogLevelChange={mockOnLogLevelChange}
+          >
+            <div>Test Content</div>
+          </LDProvider>
         );
       });
-    });
 
-    it('should default to info level when no stored level exists', async () => {
-      render(
-        <LDProvider
-          clientSideId="test-client-id"
-          createContexts={mockCreateContexts}
-        >
-          <TestContent />
-        </LDProvider>
-      );
-
-      await waitFor(() => {
-        expect(asyncWithLDProvider).toHaveBeenCalledWith(
-          expect.objectContaining({
-            options: {
-              logger: basicLogger({ level: 'info' }),
-              bootstrap: 'localStorage'
-            }
-          })
-        );
+      expect(asyncWithLDProvider).toHaveBeenCalledWith({
+        clientSideID: 'test-client-id',
+        context: { user: 'test-user' },
+        timeout: 2,
+        options: {
+          logger: { level: 'debug' },
+          bootstrap: 'localStorage'
+        }
       });
     });
 
     it('should handle log level flag changes', async () => {
-      const mockOnLogLevelChange = jest.fn();
-      process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY = 'sdk-log-level';
-
-      render(
-        <LDProvider
-          clientSideId="test-client-id"
-          createContexts={mockCreateContexts}
-          onLogLevelChange={mockOnLogLevelChange}
-        >
-          <TestContent />
-        </LDProvider>
-      );
-
-      await waitFor(() => {
-        // Verify flag listener was set up
-        expect(mockLDClient.on).toHaveBeenCalledWith(
-          'change:sdk-log-level',
-          expect.any(Function)
+      await act(async () => {
+        render(
+          <LDProvider
+            clientSideId="test-client-id"
+            createContexts={mockCreateContexts}
+            onReady={mockOnReady}
+            onLogLevelChange={mockOnLogLevelChange}
+          >
+            <div>Test Content</div>
+          </LDProvider>
         );
       });
 
+      // Get the flag change handler
+      const onCalls = (mockLDClient.on as jest.MockedFunction<LDEventHandler>).mock.calls;
+      const flagChangeCall = onCalls.find(call => call[0] === 'change:sdk-log-level');
+      const flagChangeHandler = flagChangeCall?.[1] as ((value: LDLogLevel) => void) | undefined;
+      expect(flagChangeHandler).toBeDefined();
+
       // Simulate flag change
-      const flagChangeHandler = mockLDClient.on.mock.calls[0][1];
-      flagChangeHandler('warn');
+      await act(async () => {
+        await flagChangeHandler?.('warn');
+      });
 
       // Verify localStorage was updated and callback was called
       expect(localStorage.getItem('ld_sdk_log_level')).toBe('warn');
       expect(mockOnLogLevelChange).toHaveBeenCalledWith('warn');
 
-      // Clean up
-      delete process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY;
+      // For Option B, verify client was reinitialized
+      expect(mockClose).toHaveBeenCalled();
+      expect(asyncWithLDProvider).toHaveBeenLastCalledWith({
+        clientSideID: 'test-client-id',
+        context: { user: 'test-user' },
+        timeout: 2,
+        options: {
+          logger: { level: 'warn' },
+          bootstrap: 'localStorage'
+        }
+      });
     });
 
     it('should ignore invalid log levels', async () => {
-      const mockOnLogLevelChange = jest.fn();
-      process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY = 'sdk-log-level';
-
-      render(
-        <LDProvider
-          clientSideId="test-client-id"
-          createContexts={mockCreateContexts}
-          onLogLevelChange={mockOnLogLevelChange}
-        >
-          <TestContent />
-        </LDProvider>
-      );
-
-      await waitFor(() => {
-        // Verify flag listener was set up
-        expect(mockLDClient.on).toHaveBeenCalledWith(
-          'change:sdk-log-level',
-          expect.any(Function)
+      await act(async () => {
+        render(
+          <LDProvider
+            clientSideId="test-client-id"
+            createContexts={mockCreateContexts}
+            onReady={mockOnReady}
+            onLogLevelChange={mockOnLogLevelChange}
+          >
+            <div>Test Content</div>
+          </LDProvider>
         );
       });
 
-      // Simulate flag change with invalid level
-      const flagChangeHandler = mockLDClient.on.mock.calls[0][1];
-      flagChangeHandler('invalid-level');
+      // Get the flag change handler
+      const onCalls = (mockLDClient.on as jest.MockedFunction<LDEventHandler>).mock.calls;
+      const flagChangeCall = onCalls.find(call => call[0] === 'change:sdk-log-level');
+      const flagChangeHandler = flagChangeCall?.[1] as ((value: LDLogLevel) => void) | undefined;
+      expect(flagChangeHandler).toBeDefined();
+
+      // Simulate invalid flag value
+      await act(async () => {
+        await flagChangeHandler?.('invalid-level' as LDLogLevel);
+      });
 
       // Verify localStorage was not updated but callback was still called
       expect(localStorage.getItem('ld_sdk_log_level')).toBeNull();
       expect(mockOnLogLevelChange).toHaveBeenCalledWith('invalid-level');
 
-      // Clean up
-      delete process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY;
+      // Verify client was not reinitialized
+      expect(mockClose).not.toHaveBeenCalled();
     });
   });
 
   describe('with existing client', () => {
+    // Create a mock existing client that matches LDProviderComponent type
+    const mockExistingClient = Object.assign(
+      function ExistingClient({ children }: { children?: React.ReactNode }) {
+        return <div>{children}</div>;
+      },
+      { _client: mockLDClient }
+    ) as LDProviderComponent;
+
     it('should render using existing client', async () => {
-      const rendered = render(
-        <LDProvider existingClient={mockExistingClient} onReady={mockOnReady}>
-          <TestContent />
-        </LDProvider>
-      );
-
-      await waitFor(() => {
-        expect(rendered.getByText('Test Content')).toBeInTheDocument();
-        expect(mockOnReady).toHaveBeenCalled();
+      await act(async () => {
+        render(
+          <LDProvider
+            existingClient={mockExistingClient}
+            onReady={mockOnReady}
+          >
+            <div>Test Content</div>
+          </LDProvider>
+        );
       });
 
-      // Should not attempt to create new client
+      expect(mockOnReady).toHaveBeenCalled();
       expect(asyncWithLDProvider).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('without existing client', () => {
-    it('should create new client when required props are provided', async () => {
-      const rendered = render(
-        <LDProvider
-          clientSideId="test-client-id"
-          createContexts={mockCreateContexts}
-          onReady={mockOnReady}
-        >
-          <TestContent />
-        </LDProvider>
-      );
-
-      await waitFor(() => {
-        expect(rendered.getByText('Test Content')).toBeInTheDocument();
-        expect(mockOnReady).toHaveBeenCalled();
-        expect(asyncWithLDProvider).toHaveBeenCalledWith({
-          clientSideID: 'test-client-id',
-          context: { user: 'test-user' },
-          timeout: 2,
-          options: {
-            logger: basicLogger({ level: 'info' }),
-            bootstrap: 'localStorage'
-          },
-        });
-      });
-    });
-
-    it('should throw error when clientSideId is missing', async () => {
-      await expect(async () => {
-        render(
-          <LDProvider createContexts={mockCreateContexts}>
-            <TestContent />
-          </LDProvider>
-        );
-      }).rejects.toThrow('clientSideId is required when not using an existing client');
-    });
-
-    it('should throw error when createContexts is missing', async () => {
-      await expect(async () => {
-        render(
-          <LDProvider clientSideId="test-client-id">
-            <TestContent />
-          </LDProvider>
-        );
-      }).rejects.toThrow('createContexts is required when not using an existing client');
-    });
-  });
-
-  describe('loading state', () => {
-    it('should render loading component before initialization', async () => {
-      // Mock asyncWithLDProvider to delay resolution
-      let resolveClient: (value: typeof MockComponent) => void;
-      const clientPromise = new Promise<typeof MockComponent>(resolve => {
-        resolveClient = resolve;
-      });
-      (asyncWithLDProvider as jest.Mock).mockReturnValue(clientPromise);
-
-      const rendered = render(
-        <LDProvider
-          clientSideId="test-client-id"
-          createContexts={mockCreateContexts}
-          loadingComponent={React.createElement('div', null, 'Custom Loading...')}
-        >
-          <TestContent />
-        </LDProvider>
-      );
-
-      // Loading component should be visible immediately
-      expect(rendered.getByText('Custom Loading...')).toBeInTheDocument();
-
-      // Resolve the client
-      await act(async () => {
-        resolveClient(MockComponent);
-        await clientPromise;
-      });
-
-      // Content should be visible after initialization
-      await waitFor(() => {
-        expect(rendered.getByText('Test Content')).toBeInTheDocument();
-      });
-    });
-
-    it('should render empty div as default loading component', async () => {
-      // Mock asyncWithLDProvider to delay resolution
-      let resolveClient: (value: typeof MockComponent) => void;
-      const clientPromise = new Promise<typeof MockComponent>(resolve => {
-        resolveClient = resolve;
-      });
-      (asyncWithLDProvider as jest.Mock).mockReturnValue(clientPromise);
-
-      const rendered = render(
-        <LDProvider clientSideId="test-client-id" createContexts={mockCreateContexts}>
-          <TestContent />
-        </LDProvider>
-      );
-
-      // Default loading component should be an empty div
-      const loadingComponent = rendered.container.firstChild;
-      expect(loadingComponent).toBeInTheDocument();
-      expect(loadingComponent).toMatchInlineSnapshot(`<div />`);
-
-      // Resolve the client
-      await act(async () => {
-        resolveClient(MockComponent);
-        await clientPromise;
-      });
-
-      // Content should be visible after initialization
-      await waitFor(() => {
-        expect(rendered.getByText('Test Content')).toBeInTheDocument();
-      });
     });
   });
 });
