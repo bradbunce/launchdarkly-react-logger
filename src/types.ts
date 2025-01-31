@@ -1,11 +1,13 @@
 // src/types.ts
-import { ReactNode } from 'react';
+import { ReactNode, ComponentType } from 'react';
 import { LDClient } from 'launchdarkly-react-client-sdk';
 
-export type LDProviderComponent = React.ComponentType<{ children: ReactNode }>;
+export type LDProviderComponent = ComponentType<{ children?: ReactNode }> & {
+  _client?: LDClient;
+};
 
 export interface LDProviderProps {
-  children: ReactNode;
+  children?: ReactNode;
   onReady?: () => void;
   /** Function to create LaunchDarkly contexts. Only used when creating a new client. */
   createContexts?: (user: any) => any;
@@ -18,5 +20,5 @@ export interface LDProviderProps {
 }
 
 export interface LoggerContextType {
- ldClient: LDClient | null;
+  ldClient: LDClient | null;
 }

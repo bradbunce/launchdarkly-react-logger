@@ -37,7 +37,6 @@ describe('Logger', () => {
 
     // Set up test environment variable
     process.env.REACT_APP_LD_CONSOLE_LOG_FLAG_KEY = 'log-level';
-    process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY = 'sdk-log-level';
 
     // Create fresh logger instance for each test
     logger = new Logger();
@@ -132,60 +131,6 @@ describe('Logger', () => {
       expect(() => newLogger.error('test')).toThrow(
         'REACT_APP_LD_CONSOLE_LOG_FLAG_KEY environment variable is not set'
       );
-    });
-
-    it('should throw error when SDK log flag env variable is not set', () => {
-      delete process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY;
-      const newLogger = new Logger();
-      newLogger.setLDClient(mockLDClient);
-      expect(() => newLogger.getSdkLogLevel('info')).toThrow(
-        'REACT_APP_LD_SDK_LOG_FLAG_KEY environment variable is not set'
-      );
-    });
-  });
-
-  describe('SDK Logging', () => {
-    it('should get SDK log level from feature flag', () => {
-      mockLDClient.variation.mockReturnValue('debug');
-      expect(logger.getSdkLogLevel('info')).toBe('debug');
-      expect(mockLDClient.variation).toHaveBeenCalledWith('sdk-log-level', 'info');
-    });
-
-    it('should use fallback when feature flag returns null', () => {
-      mockLDClient.variation.mockReturnValue(null);
-      expect(logger.getSdkLogLevel('warn')).toBe('warn');
-    });
-
-    it('should throw error when no fallback is provided and flag returns null', () => {
-      mockLDClient.variation.mockReturnValue(null);
-      expect(() => logger.getSdkLogLevel(null as any)).toThrow(
-        'SDK log level flag returned null and no fallback was provided'
-      );
-    });
-
-    it('should throw error when SDK log flag env variable is not set', () => {
-      delete process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY;
-      const newLogger = new Logger();
-      newLogger.setLDClient(mockLDClient);
-      expect(() => newLogger.getSdkLogLevel('info')).toThrow(
-        'REACT_APP_LD_SDK_LOG_FLAG_KEY environment variable is not set'
-      );
-    });
-
-    it('should throw error when LaunchDarkly client is not initialized', () => {
-      const newLogger = new Logger();
-      expect(() => newLogger.getSdkLogLevel('info')).toThrow(
-        'LaunchDarkly client is not initialized'
-      );
-    });
-
-    it('should create SDK logger with correct level', () => {
-      mockLDClient.variation.mockReturnValue('warn');
-      const sdkLogger = logger.createSdkLogger('info');
-      expect(sdkLogger).toHaveProperty('debug');
-      expect(sdkLogger).toHaveProperty('info');
-      expect(sdkLogger).toHaveProperty('warn');
-      expect(sdkLogger).toHaveProperty('error');
     });
   });
 

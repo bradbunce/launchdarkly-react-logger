@@ -1,19 +1,28 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { asyncWithLDProvider } from 'launchdarkly-react-client-sdk';
+import React, { createContext, useContext, useState, useEffect, useRef, ComponentType } from 'react';
+import { asyncWithLDProvider, basicLogger, LDLogLevel, LDClient } from 'launchdarkly-react-client-sdk';
 import { LDProviderComponent, LDProviderProps } from '../types';
 import { logger } from '../logger';
 
 const LDContext = createContext<LDProviderComponent | null>(null);
 
-export const LDProvider: React.FC<LDProviderProps> = ({
+interface LDProviderExtendedProps extends LDProviderProps {
+  onLogLevelChange?: (level: LDLogLevel) => void;
+}
+
+const MockComponent: LDProviderComponent = function MockComponent(props) {
+  return React.createElement(React.Fragment, null, props.children);
+};
+
+export const LDProvider = ({
   children,
   onReady,
   createContexts,
   clientSideId = process.env.REACT_APP_LD_CLIENTSIDE_ID,
   existingClient,
-  loadingComponent = <div />
-}) => {
-  const [LDClient, setLDClient] = useState<LDProviderComponent | null>(null);
+  loadingComponent = React.createElement('div'),
+  onLogLevelChange
+}: LDProviderExtendedProps) => {
+  const [client, setClient] = useState<LDProviderComponent>(() => MockComponent);
   const [error, setError] = useState<Error | null>(null);
   const initializationRef = useRef(false);
 
@@ -25,7 +34,7 @@ export const LDProvider: React.FC<LDProviderProps> = ({
       try {
         // If an existing client is provided, use it
         if (existingClient) {
-          setLDClient(() => existingClient);
+          setClient(() => existingClient);
           onReady?.();
           return;
         }
@@ -38,6 +47,12 @@ export const LDProvider: React.FC<LDProviderProps> = ({
           throw new Error('createContexts is required when not using an existing client');
         }
 
+        // Get stored log level or default to 'info'
+        const storedLogLevel = localStorage.getItem('ld_sdk_log_level');
+        const logLevel: LDLogLevel = (storedLogLevel && ['error', 'warn', 'info', 'debug'].includes(storedLogLevel)) 
+          ? storedLogLevel as LDLogLevel 
+          : 'info';
+
         // Create a new client
         const initialContexts = createContexts(null);
         const LDProviderComponent = await asyncWithLDProvider({
@@ -45,11 +60,26 @@ export const LDProvider: React.FC<LDProviderProps> = ({
           context: initialContexts,
           timeout: 2,
           options: {
-            logger: logger.createSdkLogger('info'),
-          },
+            logger: basicLogger({ level: logLevel }),
+            bootstrap: 'localStorage'
+          }
         });
 
-        setLDClient(() => LDProviderComponent);
+        // Set up flag listener after client is initialized
+        if (process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY && (LDProviderComponent as any)._client) {
+          const ldClient = (LDProviderComponent as any)._client as LDClient;
+          ldClient.on(`change:${process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY}`, (value: LDLogLevel) => {
+            // Always notify parent of the change
+            onLogLevelChange?.(value);
+            
+            // Only store if it's a valid log level
+            if (['error', 'warn', 'info', 'debug'].includes(value)) {
+              localStorage.setItem('ld_sdk_log_level', value);
+            }
+          });
+        }
+
+        setClient(() => LDProviderComponent as LDProviderComponent);
         onReady?.();
       } catch (error) {
         if (error instanceof Error) {
@@ -61,16 +91,18 @@ export const LDProvider: React.FC<LDProviderProps> = ({
     };
 
     initializeLDClient();
-  }, [onReady, createContexts, clientSideId, existingClient]);
+  }, [onReady, createContexts, clientSideId, existingClient, onLogLevelChange]);
 
   if (error) throw error;
-  if (!LDClient) return loadingComponent;
+  if (client === MockComponent) {
+    return React.createElement(React.Fragment, null, loadingComponent);
+  }
 
-  return (
-    <LDContext.Provider value={LDClient}>
-      <LDClient>{children}</LDClient>
-    </LDContext.Provider>
+  return React.createElement(
+    LDContext.Provider,
+    { value: client },
+    React.createElement(client, { children })
   );
 };
 
-export const useLDClient = () => useContext(LDContext);
+export const useLDClient = (): LDProviderComponent | null => useContext(LDContext);

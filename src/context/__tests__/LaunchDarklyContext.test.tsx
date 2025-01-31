@@ -1,4 +1,7 @@
-import React from 'react';
+/** @jsxRuntime classic */
+/** @jsx React.createElement */
+/** @jsxFrag React.Fragment */
+import React, { FC, PropsWithChildren } from 'react';
 import { render, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { LDProvider } from '../LaunchDarklyContext';
@@ -9,13 +12,14 @@ import { logger } from '../../logger';
 jest.mock('launchdarkly-react-client-sdk', () => ({
   asyncWithLDProvider: jest.fn(),
   useLDClient: jest.fn(),
+  basicLogger: jest.fn(({ level }) => ({ level })),
 }));
 
 // Mock the logger to avoid actual logging during tests
 jest.mock('../../logger', () => ({
   useLogger: jest.fn(),
   logger: {
-    createSdkLogger: jest.fn().mockReturnValue({ level: 'info' }),
+    getSdkLogLevel: jest.fn().mockReturnValue('info'),
   },
 }));
 
@@ -30,23 +34,148 @@ describe('LDProvider', () => {
     console.error = originalError;
   });
 
-  const MockComponent = ({ children }: { children: React.ReactNode }) => <>{children}</>;
+  const MockComponent: FC<PropsWithChildren> = ({ children }) => <>{children}</>;
+  const TestContent: FC = () => <div data-testid="content">Test Content</div>;
   const mockExistingClient = jest.fn().mockImplementation(MockComponent);
   const mockCreateContexts = () => ({ user: 'test-user' });
   const mockOnReady = jest.fn();
-  const mockLDClient = { variation: jest.fn() };
+  const mockLDClient = { 
+    variation: jest.fn(),
+    on: jest.fn(),
+    off: jest.fn()
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
-    (asyncWithLDProvider as jest.Mock).mockResolvedValue(MockComponent);
+    (asyncWithLDProvider as jest.Mock).mockResolvedValue(Object.assign(MockComponent, {
+      _client: mockLDClient
+    }));
     (useLDClient as jest.Mock).mockReturnValue(mockLDClient);
+    // Clear localStorage before each test
+    localStorage.clear();
+  });
+
+  describe('SDK log level handling', () => {
+    it('should use stored log level from localStorage', async () => {
+      localStorage.setItem('ld_sdk_log_level', 'debug');
+
+      render(
+        <LDProvider
+          clientSideId="test-client-id"
+          createContexts={mockCreateContexts}
+        >
+          <TestContent />
+        </LDProvider>
+      );
+
+      await waitFor(() => {
+        expect(asyncWithLDProvider).toHaveBeenCalledWith(
+          expect.objectContaining({
+            options: {
+              logger: basicLogger({ level: 'debug' }),
+              bootstrap: 'localStorage'
+            }
+          })
+        );
+      });
+    });
+
+    it('should default to info level when no stored level exists', async () => {
+      render(
+        <LDProvider
+          clientSideId="test-client-id"
+          createContexts={mockCreateContexts}
+        >
+          <TestContent />
+        </LDProvider>
+      );
+
+      await waitFor(() => {
+        expect(asyncWithLDProvider).toHaveBeenCalledWith(
+          expect.objectContaining({
+            options: {
+              logger: basicLogger({ level: 'info' }),
+              bootstrap: 'localStorage'
+            }
+          })
+        );
+      });
+    });
+
+    it('should handle log level flag changes', async () => {
+      const mockOnLogLevelChange = jest.fn();
+      process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY = 'sdk-log-level';
+
+      render(
+        <LDProvider
+          clientSideId="test-client-id"
+          createContexts={mockCreateContexts}
+          onLogLevelChange={mockOnLogLevelChange}
+        >
+          <TestContent />
+        </LDProvider>
+      );
+
+      await waitFor(() => {
+        // Verify flag listener was set up
+        expect(mockLDClient.on).toHaveBeenCalledWith(
+          'change:sdk-log-level',
+          expect.any(Function)
+        );
+      });
+
+      // Simulate flag change
+      const flagChangeHandler = mockLDClient.on.mock.calls[0][1];
+      flagChangeHandler('warn');
+
+      // Verify localStorage was updated and callback was called
+      expect(localStorage.getItem('ld_sdk_log_level')).toBe('warn');
+      expect(mockOnLogLevelChange).toHaveBeenCalledWith('warn');
+
+      // Clean up
+      delete process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY;
+    });
+
+    it('should ignore invalid log levels', async () => {
+      const mockOnLogLevelChange = jest.fn();
+      process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY = 'sdk-log-level';
+
+      render(
+        <LDProvider
+          clientSideId="test-client-id"
+          createContexts={mockCreateContexts}
+          onLogLevelChange={mockOnLogLevelChange}
+        >
+          <TestContent />
+        </LDProvider>
+      );
+
+      await waitFor(() => {
+        // Verify flag listener was set up
+        expect(mockLDClient.on).toHaveBeenCalledWith(
+          'change:sdk-log-level',
+          expect.any(Function)
+        );
+      });
+
+      // Simulate flag change with invalid level
+      const flagChangeHandler = mockLDClient.on.mock.calls[0][1];
+      flagChangeHandler('invalid-level');
+
+      // Verify localStorage was not updated but callback was still called
+      expect(localStorage.getItem('ld_sdk_log_level')).toBeNull();
+      expect(mockOnLogLevelChange).toHaveBeenCalledWith('invalid-level');
+
+      // Clean up
+      delete process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY;
+    });
   });
 
   describe('with existing client', () => {
     it('should render using existing client', async () => {
       const rendered = render(
         <LDProvider existingClient={mockExistingClient} onReady={mockOnReady}>
-          <div>Test Content</div>
+          <TestContent />
         </LDProvider>
       );
 
@@ -68,7 +197,7 @@ describe('LDProvider', () => {
           createContexts={mockCreateContexts}
           onReady={mockOnReady}
         >
-          <div>Test Content</div>
+          <TestContent />
         </LDProvider>
       );
 
@@ -80,10 +209,10 @@ describe('LDProvider', () => {
           context: { user: 'test-user' },
           timeout: 2,
           options: {
-            logger: { level: 'info' },
+            logger: basicLogger({ level: 'info' }),
+            bootstrap: 'localStorage'
           },
         });
-        expect(logger.createSdkLogger).toHaveBeenCalled();
       });
     });
 
@@ -91,7 +220,7 @@ describe('LDProvider', () => {
       await expect(async () => {
         render(
           <LDProvider createContexts={mockCreateContexts}>
-            <div>Test Content</div>
+            <TestContent />
           </LDProvider>
         );
       }).rejects.toThrow('clientSideId is required when not using an existing client');
@@ -101,7 +230,7 @@ describe('LDProvider', () => {
       await expect(async () => {
         render(
           <LDProvider clientSideId="test-client-id">
-            <div>Test Content</div>
+            <TestContent />
           </LDProvider>
         );
       }).rejects.toThrow('createContexts is required when not using an existing client');
@@ -121,9 +250,9 @@ describe('LDProvider', () => {
         <LDProvider
           clientSideId="test-client-id"
           createContexts={mockCreateContexts}
-          loadingComponent={<div>Custom Loading...</div>}
+          loadingComponent={React.createElement('div', null, 'Custom Loading...')}
         >
-          <div>Test Content</div>
+          <TestContent />
         </LDProvider>
       );
 
@@ -152,7 +281,7 @@ describe('LDProvider', () => {
 
       const rendered = render(
         <LDProvider clientSideId="test-client-id" createContexts={mockCreateContexts}>
-          <div>Test Content</div>
+          <TestContent />
         </LDProvider>
       );
 

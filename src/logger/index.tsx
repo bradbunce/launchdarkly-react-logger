@@ -30,26 +30,6 @@ export class Logger {
   private readonly SDK_LOG_FLAG_KEY = process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY;
 
   /**
-   * Sets the LaunchDarkly client instance for feature flag evaluation
-   * @param client - LaunchDarkly client instance or null to clear
-   */
-  setLDClient(client: LDClient | null): void {
-    this.ldClient = client;
-  }
-
-  /**
-   * Gets the current console log level from LaunchDarkly feature flag
-   * @returns Current LogLevel value
-   * @throws Error if REACT_APP_LD_CONSOLE_LOG_FLAG_KEY is not set
-   */
-  private getCurrentLogLevel(): LogLevel {
-    if (!this.CONSOLE_LOG_FLAG_KEY) {
-      throw new Error('REACT_APP_LD_CONSOLE_LOG_FLAG_KEY environment variable is not set');
-    }
-    return this.ldClient?.variation(this.CONSOLE_LOG_FLAG_KEY, LogLevel.ERROR) ?? LogLevel.ERROR;
-  }
-
-  /**
    * Gets the current SDK log level from LaunchDarkly feature flag
    * @param fallback - Fallback log level if flag returns null
    * @returns Current SDK log level
@@ -70,12 +50,23 @@ export class Logger {
   }
 
   /**
-   * Creates a LaunchDarkly logger instance based on the current SDK log level
-   * @param fallback - Fallback log level if flag returns null
-   * @returns LaunchDarkly logger instance
+   * Sets the LaunchDarkly client instance for feature flag evaluation
+   * @param client - LaunchDarkly client instance or null to clear
    */
-  createSdkLogger(fallback: LDLogLevel) {
-    return basicLogger({ level: this.getSdkLogLevel(fallback) });
+  setLDClient(client: LDClient | null): void {
+    this.ldClient = client;
+  }
+
+  /**
+   * Gets the current console log level from LaunchDarkly feature flag
+   * @returns Current LogLevel value
+   * @throws Error if REACT_APP_LD_CONSOLE_LOG_FLAG_KEY is not set
+   */
+  private getCurrentLogLevel(): LogLevel {
+    if (!this.CONSOLE_LOG_FLAG_KEY) {
+      throw new Error('REACT_APP_LD_CONSOLE_LOG_FLAG_KEY environment variable is not set');
+    }
+    return this.ldClient?.variation(this.CONSOLE_LOG_FLAG_KEY, LogLevel.ERROR) ?? LogLevel.ERROR;
   }
 
   /**
@@ -207,13 +198,13 @@ export const useLogger = (): Logger => {
   const ldClient = useLDClient();
 
   useEffect(() => {
-    if (ldClient) {
-      logger.setLDClient(ldClient);
-    }
+    if (!ldClient) return;
+
+    // Set up the client
+    logger.setLDClient(ldClient);
+
     return () => {
-      if (ldClient) {
-        logger.setLDClient(null);
-      }
+      logger.setLDClient(null);
     };
   }, [ldClient]);
 
