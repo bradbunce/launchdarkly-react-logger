@@ -24,33 +24,39 @@ npm install @bradbunce/launchdarkly-react-logger
 
 ### 1. Configuration
 
-The logger utility requires three values from your LaunchDarkly setup:
+The logger utility requires three values from your LaunchDarkly setup. These are REQUIRED variables - there are no default values or fallbacks:
 
 1. Client-side ID (for LaunchDarkly SDK initialization)
 2. Feature flag key for console log level control
 3. Feature flag key for SDK log level control
 
-You must create these feature flags in your LaunchDarkly account and provide their keys to the logger. You have two options for providing these values:
+You MUST create these feature flags in your LaunchDarkly account and provide their keys to the logger. The logger will throw errors if any of these values are not provided. You have two options for providing these values:
 
-#### Option A: Environment Variables (Recommended)
-Define the values as environment variables in your application:
+#### Option A: Configuration File (Recommended)
+Create a configuration file in your application to manage these values:
 
-```env
-# Note: Prefix may vary based on your build tool (REACT_APP_, VITE_, NEXT_PUBLIC_, etc.)
-LD_CLIENTSIDE_ID=your-ld-client-id
-LD_CONSOLE_LOG_FLAG_KEY=your-console-logging-flag-key
-LD_SDK_LOG_FLAG_KEY=your-sdk-logging-flag-key
-```
-
-Then use them to configure the logger:
 ```typescript
-import { Logger } from '@bradbunce/launchdarkly-react-logger';
+// logger-config.ts
+export const loggerConfig = {
+  consoleLogFlagKey: 'your-console-log-flag-key',  // Required - no default value
+  sdkLogFlagKey: 'your-sdk-log-flag-key'          // Required - no default value
+};
 
-export const logger = new Logger({
-  consoleLogFlagKey: process.env.LD_CONSOLE_LOG_FLAG_KEY,
-  sdkLogFlagKey: process.env.LD_SDK_LOG_FLAG_KEY
-});
+// Then use it to configure the logger:
+import { Logger } from '@bradbunce/launchdarkly-react-logger';
+import { loggerConfig } from './logger-config';
+
+export const logger = new Logger(loggerConfig);
 ```
+
+This approach allows you to manage these values in a way that best suits your application's setup and build process.
+
+For convenience, we provide example environment files for popular frameworks:
+- `.env.example.cra` - Create React App (uses REACT_APP_ prefix)
+- `.env.example.vite` - Vite (uses VITE_ prefix)
+- `.env.example.nextjs` - Next.js (uses NEXT_PUBLIC_ prefix)
+
+These are just examples - you can configure these values however best fits your application's needs. Choose the appropriate example if it matches your setup, or use them as a reference for your own configuration approach.
 
 #### Option B: Direct Configuration
 You can also provide the values directly:
@@ -59,8 +65,8 @@ You can also provide the values directly:
 import { Logger } from '@bradbunce/launchdarkly-react-logger';
 
 export const logger = new Logger({
-  consoleLogFlagKey: 'your-console-log-flag-key',
-  sdkLogFlagKey: 'your-sdk-log-flag-key'
+  consoleLogFlagKey: 'your-console-log-flag-key',  // Required - no default value
+  sdkLogFlagKey: 'your-sdk-log-flag-key'          // Required - no default value
 });
 ```
 
