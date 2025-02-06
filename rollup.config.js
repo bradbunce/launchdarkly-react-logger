@@ -3,6 +3,7 @@ import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import peerDepsExternal from 'rollup-plugin-peer-deps-external';
 import terser from '@rollup/plugin-terser';
+import replace from '@rollup/plugin-replace';
 import dts from 'rollup-plugin-dts';
 import { readFileSync } from 'fs';
 
@@ -27,6 +28,12 @@ export default [
       peerDepsExternal(),
       resolve(),
       commonjs(),
+      replace({
+        preventAssignment: true,
+        values: {
+          'process.env': 'undefined'
+        }
+      }),
       typescript({ tsconfig: './tsconfig.json' }),
       terser()
     ],
