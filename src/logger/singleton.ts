@@ -1,11 +1,20 @@
 import { Logger } from './index';
 
-/** Singleton instance of the Logger with environment variable configuration */
+/**
+ * Singleton instance of the Logger
+ * 
+ * IMPORTANT: The application using this logger must provide:
+ * 1. LaunchDarkly client-side ID
+ * 2. Feature flag key for console log level control
+ * 3. Feature flag key for SDK log level control
+ * 
+ * These values should be defined as environment variables in the application.
+ */
 export const logger = new Logger({
-  consoleLogFlagKey: process.env.REACT_APP_LD_CONSOLE_LOG_FLAG_KEY || (() => {
-    throw new Error('REACT_APP_LD_CONSOLE_LOG_FLAG_KEY environment variable is not set');
+  consoleLogFlagKey: (() => {
+    throw new Error('Console log flag key must be provided by the application');
   })(),
-  sdkLogFlagKey: process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY || (() => {
-    throw new Error('REACT_APP_LD_SDK_LOG_FLAG_KEY environment variable is not set');
+  sdkLogFlagKey: (() => {
+    throw new Error('SDK log flag key must be provided by the application');
   })()
 });

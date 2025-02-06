@@ -23,51 +23,52 @@ npm install @bradbunce/launchdarkly-react-logger
 ## Setup
 
 ### 1. Configuration
-The logger can be configured in two ways:
 
-#### Option A: Environment Variables (Default)
-The following environment variables are required when using the default logger:
+The logger utility requires three values from your LaunchDarkly setup:
+
+1. Client-side ID (for LaunchDarkly SDK initialization)
+2. Feature flag key for console log level control
+3. Feature flag key for SDK log level control
+
+You must create these feature flags in your LaunchDarkly account and provide their keys to the logger. You have two options for providing these values:
+
+#### Option A: Environment Variables (Recommended)
+Define the values as environment variables in your application:
 
 ```env
-# Your LaunchDarkly client-side ID
-REACT_APP_LD_CLIENTSIDE_ID=your-client-id
-
-# The feature flag key you created in LaunchDarkly for controlling console log levels
-REACT_APP_LD_CONSOLE_LOG_FLAG_KEY=your-flag-key
-
-# The feature flag key you created in LaunchDarkly for controlling SDK log levels
-REACT_APP_LD_SDK_LOG_FLAG_KEY=your-flag-key
+# Note: Prefix may vary based on your build tool (REACT_APP_, VITE_, NEXT_PUBLIC_, etc.)
+LD_CLIENTSIDE_ID=your-ld-client-id
+LD_CONSOLE_LOG_FLAG_KEY=your-console-logging-flag-key
+LD_SDK_LOG_FLAG_KEY=your-sdk-logging-flag-key
 ```
 
-Note: The default logger will throw an error if either environment variable is not set.
+Then use them to configure the logger:
+```typescript
+import { Logger } from '@bradbunce/launchdarkly-react-logger';
 
-#### Option B: Parameter Injection
-You can create a custom logger instance with your own configuration:
+export const logger = new Logger({
+  consoleLogFlagKey: process.env.LD_CONSOLE_LOG_FLAG_KEY,
+  sdkLogFlagKey: process.env.LD_SDK_LOG_FLAG_KEY
+});
+```
+
+#### Option B: Direct Configuration
+You can also provide the values directly:
 
 ```typescript
-import { Logger } from 'launchdarkly-react-logger';
+import { Logger } from '@bradbunce/launchdarkly-react-logger';
 
-const customLogger = new Logger({
+export const logger = new Logger({
   consoleLogFlagKey: 'your-console-log-flag-key',
   sdkLogFlagKey: 'your-sdk-log-flag-key'
 });
 ```
 
-The default singleton instance (`logger`) requires environment variables:
-```typescript
-export const logger = new Logger({
-  consoleLogFlagKey: process.env.REACT_APP_LD_CONSOLE_LOG_FLAG_KEY || (() => {
-    throw new Error('REACT_APP_LD_CONSOLE_LOG_FLAG_KEY environment variable is not set');
-  })(),
-  sdkLogFlagKey: process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY || (() => {
-    throw new Error('REACT_APP_LD_SDK_LOG_FLAG_KEY environment variable is not set');
-  })()
-});
-```
+Note: The logger will throw errors if these values are not provided. This ensures proper configuration and prevents undefined behavior.
 
 The logger is structured in modular files:
 - `logger/index.tsx`: Core Logger class and types
-- `logger/singleton.ts`: Environment variable-dependent singleton instance
+- `logger/singleton.ts`: Singleton logger instance requiring flag key configuration
 - `logger/useLogger.ts`: React hook for accessing the logger
 
 This modular structure allows for:
@@ -78,12 +79,12 @@ This modular structure allows for:
 ### 2. LaunchDarkly Configuration
 1. Create a console logging feature flag in LaunchDarkly with:
    - Type: Number
-   - Name: Your choice (use this as REACT_APP_LD_CONSOLE_LOG_FLAG_KEY)
-   - Values: 0-5 corresponding to log levels (FATAL=0, ERROR=1, WARN=2, INFO=3, DEBUG=4, TRACE=5)
+   - Name: Your choice (this will be your consoleLogFlagKey)
+   - Values: 0-5 corresponding to levels (FATAL=0, ERROR=1, WARN=2, INFO=3, DEBUG=4, TRACE=5)
 
 2. Create an SDK logging feature flag in LaunchDarkly with:
    - Type: String
-   - Name: Your choice (use this as REACT_APP_LD_SDK_LOG_FLAG_KEY)
+   - Name: Your choice (this will be your sdkLogFlagKey)
    - Values: 'error', 'warn', 'info', 'debug' (these control the LaunchDarkly SDK's internal logging)
 
 3. Create your contexts configuration:
@@ -110,11 +111,11 @@ import { LDProvider } from 'launchdarkly-react-logger';
 function App() {
   // Track your LaunchDarkly client with state
   const [client, setClient] = useState(() => {
-    // Initial client setup with stored or default level
+    // Initial client setup with stored level
     const storedLevel = localStorage.getItem('ld_sdk_log_level');
     const logLevel = (storedLevel && ['error', 'warn', 'info', 'debug'].includes(storedLevel))
       ? storedLevel
-      : 'info';
+      : 'error';
 
     return withLDProvider({
       clientSideID: 'your-client-id',
@@ -161,7 +162,7 @@ function App() {
 ```
 
 This setup ensures:
-1. Your application starts with the stored log level (or 'info' as default)
+1. Your application starts with the stored log level
 2. When the SDK log level flag changes:
    - The LDProvider tracks the evaluation in analytics
    - Your application receives the new level via onLogLevelChange
@@ -192,7 +193,7 @@ function App() {
 
 With Option B:
 1. The LDProvider handles the complete lifecycle:
-   - Creates client with stored level (or 'info' default)
+   - Creates client with stored level
    - Tracks flag evaluations
    - Handles client reinitialization when flag changes
 2. You don't need to implement any SDK log level handling
@@ -202,13 +203,11 @@ With Option B:
 
 ### Basic Logging
 
-#### Using the Default Logger (Singleton)
+#### Using Your Logger Instance
 ```typescript
-import { useLogger } from 'launchdarkly-react-logger';
+import { logger } from './your-logger-config';
 
 function Component() {
-  const logger = useLogger();
-  
   logger.fatal('Fatal error message'); // 💀
   logger.error('Error message');       // 🔴
   logger.warn('Warning message');      // 🟡
@@ -218,25 +217,14 @@ function Component() {
 }
 ```
 
-#### Using a Custom Logger Instance
+#### Using with React Hook
 ```typescript
-import { Logger } from 'launchdarkly-react-logger';
-
-// Create a custom logger with your configuration
-const customLogger = new Logger({
-  consoleLogFlagKey: 'your-console-log-flag-key',
-  sdkLogFlagKey: 'your-sdk-log-flag-key'
-});
+import { useLogger } from 'launchdarkly-react-logger';
 
 function Component() {
-  // Set the LaunchDarkly client when available
-  useEffect(() => {
-    const ldClient = // ... get your LaunchDarkly client
-    customLogger.setLDClient(ldClient);
-    return () => customLogger.setLDClient(null);
-  }, []);
+  const logger = useLogger();
   
-  customLogger.info('Using custom logger');
+  logger.info('Using logger with React hook');
 }
 ```
 
@@ -268,7 +256,7 @@ function Component() {
 ## Log Levels
 Log levels are controlled by your LaunchDarkly feature flags:
 
-1. Console Log Level Flag (REACT_APP_LD_CONSOLE_LOG_FLAG_KEY):
+1. Console Log Level Flag:
    - Controls application logging (console.log, console.error, etc.)
    - Values: 0-5 corresponding to levels:
      * FATAL (0)
@@ -282,7 +270,7 @@ Log levels are controlled by your LaunchDarkly feature flags:
    - Evaluated on every log call
    - Each evaluation is tracked in LaunchDarkly analytics
 
-2. SDK Log Level Flag (REACT_APP_LD_SDK_LOG_FLAG_KEY):
+2. SDK Log Level Flag:
    - Controls LaunchDarkly SDK's internal logging
    - Values: 'error', 'warn', 'info', 'debug'
    - Important Note: The SDK's logger can only be configured during client initialization
@@ -296,7 +284,7 @@ Log levels are controlled by your LaunchDarkly feature flags:
    
    - Option B (Creating new client):
      * This utility handles the complete process:
-       - Starts with stored level or 'info'
+       - Starts with stored level
        - Tracks flag evaluations
        - When flag changes to a valid level:
          1. Stores the new level in localStorage
@@ -316,10 +304,10 @@ The project includes a comprehensive test suite that verifies:
 - Log level control through LaunchDarkly feature flags
 - All logging methods (fatal, error, warn, info, debug, trace)
 - Group and time logging functionality
-- Environment variable handling
+- Configuration validation
 - React hook lifecycle
 - SDK log level handling:
-  - Default log level behavior
+  - Log level validation
   - Local storage persistence
   - Dynamic updates through feature flags
   - Invalid log level handling
