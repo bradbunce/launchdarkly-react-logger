@@ -22,7 +22,10 @@ npm install @bradbunce/launchdarkly-react-logger
 
 ## Setup
 
-### 1. Environment Variables
+### 1. Configuration
+The logger can be configured in two ways:
+
+#### Option A: Environment Variables (Default)
 Add these environment variables to your React application:
 
 ```env
@@ -34,6 +37,26 @@ REACT_APP_LD_CONSOLE_LOG_FLAG_KEY=your-flag-key
 
 # The feature flag key you created in LaunchDarkly for controlling SDK log levels
 REACT_APP_LD_SDK_LOG_FLAG_KEY=your-flag-key
+```
+
+#### Option B: Parameter Injection
+You can create a custom logger instance with your own configuration:
+
+```typescript
+import { Logger } from 'launchdarkly-react-logger';
+
+const customLogger = new Logger({
+  consoleLogFlagKey: 'your-console-log-flag-key',
+  sdkLogFlagKey: 'your-sdk-log-flag-key'
+});
+```
+
+The default singleton instance (`logger`) uses environment variables with fallbacks:
+```typescript
+export const logger = new Logger({
+  consoleLogFlagKey: process.env.REACT_APP_LD_CONSOLE_LOG_FLAG_KEY ?? 'console-log-level',
+  sdkLogFlagKey: process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY ?? 'sdk-log-level'
+});
 ```
 
 ### 2. LaunchDarkly Configuration
@@ -162,6 +185,8 @@ With Option B:
 ## Usage
 
 ### Basic Logging
+
+#### Using the Default Logger (Singleton)
 ```typescript
 import { useLogger } from 'launchdarkly-react-logger';
 
@@ -174,6 +199,28 @@ function Component() {
   logger.info('Info message');         // 🔵
   logger.debug('Debug message');       // ⚪
   logger.trace('Trace message');       // 🟣
+}
+```
+
+#### Using a Custom Logger Instance
+```typescript
+import { Logger } from 'launchdarkly-react-logger';
+
+// Create a custom logger with your configuration
+const customLogger = new Logger({
+  consoleLogFlagKey: 'your-console-log-flag-key',
+  sdkLogFlagKey: 'your-sdk-log-flag-key'
+});
+
+function Component() {
+  // Set the LaunchDarkly client when available
+  useEffect(() => {
+    const ldClient = // ... get your LaunchDarkly client
+    customLogger.setLDClient(ldClient);
+    return () => customLogger.setLDClient(null);
+  }, []);
+  
+  customLogger.info('Using custom logger');
 }
 ```
 
