@@ -187,31 +187,3 @@ export class Logger {
     }
   }
 }
-
-/** Singleton instance of the Logger with default configuration */
-export const logger = new Logger({
-  consoleLogFlagKey: process.env.REACT_APP_LD_CONSOLE_LOG_FLAG_KEY ?? 'console-log-level',
-  sdkLogFlagKey: process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY ?? 'sdk-log-level'
-});
-
-/**
- * React hook for accessing the Logger instance
- * Automatically manages LaunchDarkly client lifecycle
- * @returns Logger instance
- */
-export const useLogger = (): Logger => {
-  const ldClient = useLDClient();
-
-  useEffect(() => {
-    if (!ldClient) return;
-
-    // Set up the client
-    logger.setLDClient(ldClient);
-
-    return () => {
-      logger.setLDClient(null);
-    };
-  }, [ldClient]);
-
-  return logger;
-};

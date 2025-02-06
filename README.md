@@ -26,7 +26,7 @@ npm install @bradbunce/launchdarkly-react-logger
 The logger can be configured in two ways:
 
 #### Option A: Environment Variables (Default)
-Add these environment variables to your React application:
+The following environment variables are required when using the default logger:
 
 ```env
 # Your LaunchDarkly client-side ID
@@ -38,6 +38,8 @@ REACT_APP_LD_CONSOLE_LOG_FLAG_KEY=your-flag-key
 # The feature flag key you created in LaunchDarkly for controlling SDK log levels
 REACT_APP_LD_SDK_LOG_FLAG_KEY=your-flag-key
 ```
+
+Note: The default logger will throw an error if either environment variable is not set.
 
 #### Option B: Parameter Injection
 You can create a custom logger instance with your own configuration:
@@ -51,13 +53,27 @@ const customLogger = new Logger({
 });
 ```
 
-The default singleton instance (`logger`) uses environment variables with fallbacks:
+The default singleton instance (`logger`) requires environment variables:
 ```typescript
 export const logger = new Logger({
-  consoleLogFlagKey: process.env.REACT_APP_LD_CONSOLE_LOG_FLAG_KEY ?? 'console-log-level',
-  sdkLogFlagKey: process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY ?? 'sdk-log-level'
+  consoleLogFlagKey: process.env.REACT_APP_LD_CONSOLE_LOG_FLAG_KEY || (() => {
+    throw new Error('REACT_APP_LD_CONSOLE_LOG_FLAG_KEY environment variable is not set');
+  })(),
+  sdkLogFlagKey: process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY || (() => {
+    throw new Error('REACT_APP_LD_SDK_LOG_FLAG_KEY environment variable is not set');
+  })()
 });
 ```
+
+The logger is structured in modular files:
+- `logger/index.tsx`: Core Logger class and types
+- `logger/singleton.ts`: Environment variable-dependent singleton instance
+- `logger/useLogger.ts`: React hook for accessing the logger
+
+This modular structure allows for:
+- Easy testing with custom logger instances
+- Clear separation of concerns
+- Flexibility in non-React environments
 
 ### 2. LaunchDarkly Configuration
 1. Create a console logging feature flag in LaunchDarkly with:
