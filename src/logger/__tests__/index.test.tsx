@@ -1,5 +1,5 @@
 import { renderHook } from '@testing-library/react';
-import { LDClient } from 'launchdarkly-js-client-sdk';
+import { LDClient, LDLogLevel } from 'launchdarkly-js-client-sdk';
 import { Logger, LogLevel, useLogger } from '../index';
 
 /**
@@ -18,6 +18,11 @@ describe('Logger', () => {
   const originalConsole = { ...console };
   const originalEnv = process.env;
 
+  const testConfig = {
+    consoleLogFlagKey: 'console-log-level',
+    sdkLogFlagKey: 'sdk-log-level'
+  };
+
   beforeEach(() => {
     // Mock all console methods to verify logging behavior
     console.error = jest.fn();
@@ -35,11 +40,8 @@ describe('Logger', () => {
       variation: jest.fn(),
     } as unknown as jest.Mocked<LDClient>;
 
-    // Set up test environment variable
-    process.env.REACT_APP_LD_CONSOLE_LOG_FLAG_KEY = 'log-level';
-
     // Create fresh logger instance for each test
-    logger = new Logger();
+    logger = new Logger(testConfig);
     logger.setLDClient(mockLDClient);
   });
 
@@ -122,14 +124,24 @@ describe('Logger', () => {
     });
   });
 
-  describe('Environment Variable Handling', () => {
-    it('should throw error when console log flag env variable is not set', () => {
-      // Test error handling when required env var is missing
-      delete process.env.REACT_APP_LD_CONSOLE_LOG_FLAG_KEY;
-      const newLogger = new Logger();
-      newLogger.setLDClient(mockLDClient);
-      expect(() => newLogger.error('test')).toThrow(
-        'REACT_APP_LD_CONSOLE_LOG_FLAG_KEY environment variable is not set'
+  describe('SDK Log Level', () => {
+    it('should throw error when client is not initialized', () => {
+      const newLogger = new Logger(testConfig);
+      expect(() => newLogger.getSdkLogLevel('error' as LDLogLevel)).toThrow(
+        'LaunchDarkly client is not initialized'
+      );
+    });
+
+    it('should use fallback when flag returns null', () => {
+      mockLDClient.variation.mockReturnValue(null);
+      const warnLevel = 'warn' as LDLogLevel;
+      expect(logger.getSdkLogLevel(warnLevel)).toBe(warnLevel);
+    });
+
+    it('should throw error when flag returns null and no fallback provided', () => {
+      mockLDClient.variation.mockReturnValue(null);
+      expect(() => logger.getSdkLogLevel(null as unknown as LDLogLevel)).toThrow(
+        'SDK log level flag returned null and no fallback was provided'
       );
     });
   });

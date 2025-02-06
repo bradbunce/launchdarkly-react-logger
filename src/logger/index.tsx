@@ -1,6 +1,11 @@
 import { useEffect } from 'react';
 import { LDClient, useLDClient, basicLogger, LDLogLevel } from 'launchdarkly-react-client-sdk';
 
+export interface LoggerConfig {
+  consoleLogFlagKey: string;
+  sdkLogFlagKey: string;
+}
+
 /**
  * Enum representing available log levels in order of severity.
  * Lower values indicate higher severity.
@@ -26,8 +31,11 @@ export enum LogLevel {
  */
 export class Logger {
   private ldClient: LDClient | null = null;
-  private readonly CONSOLE_LOG_FLAG_KEY = process.env.REACT_APP_LD_CONSOLE_LOG_FLAG_KEY;
-  private readonly SDK_LOG_FLAG_KEY = process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY;
+  private readonly config: LoggerConfig;
+
+  constructor(config: LoggerConfig) {
+    this.config = config;
+  }
 
   /**
    * Gets the current SDK log level from LaunchDarkly feature flag
@@ -36,13 +44,10 @@ export class Logger {
    * @throws Error if no fallback value is provided and flag returns null
    */
   getSdkLogLevel(fallback: LDLogLevel): LDLogLevel {
-    if (!this.SDK_LOG_FLAG_KEY) {
-      throw new Error('REACT_APP_LD_SDK_LOG_FLAG_KEY environment variable is not set');
-    }
     if (!this.ldClient) {
       throw new Error('LaunchDarkly client is not initialized');
     }
-    const level = this.ldClient.variation(this.SDK_LOG_FLAG_KEY, fallback);
+    const level = this.ldClient.variation(this.config.sdkLogFlagKey, fallback);
     if (level === null && !fallback) {
       throw new Error('SDK log level flag returned null and no fallback was provided');
     }
@@ -63,10 +68,7 @@ export class Logger {
    * @throws Error if REACT_APP_LD_CONSOLE_LOG_FLAG_KEY is not set
    */
   private getCurrentLogLevel(): LogLevel {
-    if (!this.CONSOLE_LOG_FLAG_KEY) {
-      throw new Error('REACT_APP_LD_CONSOLE_LOG_FLAG_KEY environment variable is not set');
-    }
-    return this.ldClient?.variation(this.CONSOLE_LOG_FLAG_KEY, LogLevel.ERROR) ?? LogLevel.ERROR;
+    return this.ldClient?.variation(this.config.consoleLogFlagKey, LogLevel.ERROR) ?? LogLevel.ERROR;
   }
 
   /**
@@ -186,8 +188,11 @@ export class Logger {
   }
 }
 
-/** Singleton instance of the Logger */
-export const logger = new Logger();
+/** Singleton instance of the Logger with default configuration */
+export const logger = new Logger({
+  consoleLogFlagKey: process.env.REACT_APP_LD_CONSOLE_LOG_FLAG_KEY ?? 'console-log-level',
+  sdkLogFlagKey: process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY ?? 'sdk-log-level'
+});
 
 /**
  * React hook for accessing the Logger instance
