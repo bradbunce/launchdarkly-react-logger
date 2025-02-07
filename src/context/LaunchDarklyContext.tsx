@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, ComponentType } from 'react';
 import { asyncWithLDProvider, basicLogger, LDLogLevel, LDClient } from 'launchdarkly-react-client-sdk';
 import { LDProviderComponent, LDProviderProps } from '../types';
-import { logger } from '../logger/singleton';
 
 const LDContext = createContext<LDProviderComponent | null>(null);
 

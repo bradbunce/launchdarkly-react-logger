@@ -1,14 +1,14 @@
 import { useEffect } from 'react';
 import { useLDClient } from 'launchdarkly-react-client-sdk';
-import { logger } from './singleton';
 import { Logger } from './index';
 
 /**
- * React hook for accessing the Logger instance
+ * React hook for accessing a Logger instance
  * Automatically manages LaunchDarkly client lifecycle
- * @returns Logger instance
+ * @param logger - The Logger instance to use
+ * @returns The same Logger instance with client management
  */
-export const useLogger = (): Logger => {
+export const useLogger = (logger: Logger): Logger => {
   const ldClient = useLDClient();
 
   useEffect(() => {
@@ -20,7 +20,7 @@ export const useLogger = (): Logger => {
     return () => {
       logger.setLDClient(null);
     };
-  }, [ldClient]);
+  }, [ldClient, logger]);
 
   return logger;
 };

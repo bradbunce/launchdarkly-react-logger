@@ -1,184 +1,78 @@
 # LaunchDarkly React Logger
 
-A lightweight, type-safe logging utility for React applications using LaunchDarkly feature flags to control log levels.
+A React logging utility that uses LaunchDarkly feature flags to control log levels in real-time.
 
-## Features
-- Dynamic log levels controlled via LaunchDarkly feature flags
-- TypeScript support
-- React hooks for easy integration
-- Emoji-based log level visualization
-- Performance measurement utilities
-- Debug grouping support
-- Comprehensive test coverage
+## What It Does
 
-## Requirements
-- React ≥18.2.0
-- launchdarkly-react-client-sdk ≥3.6.0
+This utility lets you:
+1. Control console logging levels through a LaunchDarkly number flag (0-5)
+2. Control LaunchDarkly SDK logging through a string flag ('error'|'warn'|'info'|'debug')
+3. Change log levels in real-time without deploying code
 
-## Installation
-```bash
-npm install @bradbunce/launchdarkly-react-logger
-```
+### Log Levels
+
+Console logging has 6 levels (controlled by number flag):
+- FATAL (0) 💀 - Most severe, unrecoverable errors
+- ERROR (1) 🔴 - Error conditions
+- WARN (2)  🟡 - Warning messages
+- INFO (3)  🔵 - General information
+- DEBUG (4) ⚪ - Debug information
+- TRACE (5) 🟣 - Fine-grained debugging
+
+Setting the flag to a number shows that level and all levels below it. For example, setting it to 3 (INFO) shows FATAL, ERROR, WARN, and INFO logs.
 
 ## Setup
 
-### 1. Configuration
+### 1. Create Feature Flags
 
-The logger utility requires three values from your LaunchDarkly setup. These are REQUIRED variables - there are no default values or fallbacks:
+In your LaunchDarkly project, create two flags:
 
-1. Client-side ID (for LaunchDarkly SDK initialization)
-2. Feature flag key for console log level control
-3. Feature flag key for SDK log level control
-
-You MUST create these feature flags in your LaunchDarkly account and provide their keys to the logger. The logger will throw errors if any of these values are not provided. You have two options for providing these values:
-
-#### Option A: Using Environment Variables
-You can use environment variables according to your framework's pattern:
-
-```typescript
-// Create React App
-import { Logger } from '@bradbunce/launchdarkly-react-logger';
-
-export const logger = new Logger({
-  consoleLogFlagKey: process.env.REACT_APP_LD_CONSOLE_LOG_FLAG_KEY,
-  sdkLogFlagKey: process.env.REACT_APP_LD_SDK_LOG_FLAG_KEY
-});
-
-// Vite
-import { Logger } from '@bradbunce/launchdarkly-react-logger';
-
-export const logger = new Logger({
-  consoleLogFlagKey: import.meta.env.VITE_LD_CONSOLE_LOG_FLAG_KEY,
-  sdkLogFlagKey: import.meta.env.VITE_LD_SDK_LOG_FLAG_KEY
-});
-
-// Next.js
-import { Logger } from '@bradbunce/launchdarkly-react-logger';
-
-export const logger = new Logger({
-  consoleLogFlagKey: process.env.NEXT_PUBLIC_LD_CONSOLE_LOG_FLAG_KEY,
-  sdkLogFlagKey: process.env.NEXT_PUBLIC_LD_SDK_LOG_FLAG_KEY
-});
-```
-
-#### Option B: Direct Configuration
-You can also provide the values directly in your code:
-
-```typescript
-import { Logger } from '@bradbunce/launchdarkly-react-logger';
-
-// Either through a configuration file
-const loggerConfig = {
-  consoleLogFlagKey: 'your-console-log-flag-key',  // Required - no default value
-  sdkLogFlagKey: 'your-sdk-log-flag-key'          // Required - no default value
-};
-
-export const logger = new Logger(loggerConfig);
-
-// Or directly in the constructor
-export const logger = new Logger({
-  consoleLogFlagKey: 'your-console-log-flag-key',  // Required - no default value
-  sdkLogFlagKey: 'your-sdk-log-flag-key'          // Required - no default value
-});
-```
-
-For convenience, we provide example environment files for popular frameworks:
-- `.env.example.cra` - Create React App (uses REACT_APP_ prefix)
-- `.env.example.vite` - Vite (uses VITE_ prefix)
-- `.env.example.nextjs` - Next.js (uses NEXT_PUBLIC_ prefix)
-
-These are just examples - you can configure these values however best fits your application's needs. Choose the appropriate example if it matches your setup, or use them as a reference for your own configuration approach.
-
-Note: The logger will throw errors if these values are not provided. This ensures proper configuration and prevents undefined behavior.
-
-The logger is structured in modular files:
-- `logger/index.tsx`: Core Logger class and types
-- `logger/singleton.ts`: Singleton logger instance requiring flag key configuration
-- `logger/useLogger.ts`: React hook for accessing the logger
-
-This modular structure allows for:
-- Easy testing with custom logger instances
-- Clear separation of concerns
-- Flexibility in non-React environments
-
-### 2. LaunchDarkly Configuration
-1. Create a console logging feature flag in LaunchDarkly with:
+1. Console Log Level Flag:
    - Type: Number
-   - Name: Your choice (this will be your consoleLogFlagKey)
-   - Values: 0-5 corresponding to levels (FATAL=0, ERROR=1, WARN=2, INFO=3, DEBUG=4, TRACE=5)
+   - Values: 0-5
+   - Example name: 'console-log-level'
 
-2. Create an SDK logging feature flag in LaunchDarkly with:
+2. SDK Log Level Flag:
    - Type: String
-   - Name: Your choice (this will be your sdkLogFlagKey)
-   - Values: 'error', 'warn', 'info', 'debug' (these control the LaunchDarkly SDK's internal logging)
+   - Values: 'error', 'warn', 'info', 'debug'
+   - Example name: 'sdk-log-level'
 
-3. Create your contexts configuration:
+### 2. Create Logger Instance
+
+Create a single logger instance to be shared across your application:
+
 ```typescript
-// contexts.ts
-export const createContexts = (user: any) => ({
-  // Your context configuration
+// logger-config.ts
+import { Logger } from '@bradbunce/launchdarkly-react-logger';
+
+// Create one logger instance with your flag keys
+export const logger = new Logger({
+  consoleLogFlagKey: 'your-console-log-flag-key',  // The number flag (0-5)
+  sdkLogFlagKey: 'your-sdk-log-flag-key'          // The string flag (error|warn|info|debug)
 });
 ```
 
-### 3. Provider Setup
+Important: Create one logger instance and export it. Don't create multiple instances.
 
-You can use the LDProvider in one of two ways:
+### 3. Set Up Provider
 
-#### Option A: Using an existing LaunchDarkly client (Recommended)
-If your application already has a LaunchDarkly client set up, you can pass it to the LDProvider to avoid creating multiple instances. This is the recommended approach as it ensures all flag evaluations are properly tracked through a single client instance.
-
-Important Note: When using Option A, your application must handle SDK log level changes:
+If you already have a LaunchDarkly client:
 
 ```typescript
-import { withLDProvider, basicLogger } from 'launchdarkly-react-client-sdk';
-import { LDProvider } from 'launchdarkly-react-logger';
+import { LDProvider } from '@bradbunce/launchdarkly-react-logger';
+import { LDLogLevel } from 'launchdarkly-react-client-sdk';
 
 function App() {
-  // Track your LaunchDarkly client with state
-  const [client, setClient] = useState(() => {
-    // Initial client setup with stored level
-    const storedLevel = localStorage.getItem('ld_sdk_log_level');
-    const logLevel = (storedLevel && ['error', 'warn', 'info', 'debug'].includes(storedLevel))
-      ? storedLevel
-      : 'error';
-
-    return withLDProvider({
-      clientSideID: 'your-client-id',
-      context: yourContexts,
-      options: {
-        logger: basicLogger({ level: logLevel })
-      }
-    })(YourComponent);
-  });
-
-  // Handle SDK log level changes
-  const handleLogLevelChange = async (value) => {
-    if (['error', 'warn', 'info', 'debug'].includes(value)) {
-      const ldClient = client._client;
-      
-      // Close current client
-      await ldClient.close();
-      
-      // Create new client with updated log level
-      const newClient = withLDProvider({
-        clientSideID: 'your-client-id',
-        context: yourContexts,
-        options: {
-          logger: basicLogger({ level: value })
-        }
-      })(YourComponent);
-      
-      // Update your application's client reference
-      setClient(newClient);
-    }
+  // Optional: Handle SDK log level changes
+  const handleLogLevelChange = (level: LDLogLevel) => {
+    console.log(`SDK log level changed to: ${level}`);
+    // Your client will be reinitialized automatically
   };
-  
+
   return (
     <LDProvider 
-      existingClient={client}
+      existingClient={yourLDClient}
       onLogLevelChange={handleLogLevelChange}
-      onReady={() => console.log('LaunchDarkly logger initialized')}
-      loadingComponent={<div>Loading...</div>}
     >
       <YourApp />
     </LDProvider>
@@ -186,29 +80,16 @@ function App() {
 }
 ```
 
-This setup ensures:
-1. Your application starts with the stored log level
-2. When the SDK log level flag changes:
-   - The LDProvider tracks the evaluation in analytics
-   - Your application receives the new level via onLogLevelChange
-   - Your application closes the current client
-   - Your application creates a new client with the updated level
-3. The change takes effect immediately since you control the client lifecycle
-
-#### Option B: Creating a new LaunchDarkly client
-If you don't have an existing LaunchDarkly client, the LDProvider can create and manage one for you:
+If you need a new client:
 
 ```typescript
-import { LDProvider } from 'launchdarkly-react-logger';
-import { createContexts } from './contexts';
+import { LDProvider } from '@bradbunce/launchdarkly-react-logger';
 
 function App() {
   return (
     <LDProvider 
       clientSideId="your-client-id"
-      createContexts={createContexts}
-      onReady={() => console.log('LaunchDarkly initialized')}
-      loadingComponent={<div>Loading LaunchDarkly...</div>}
+      createContexts={yourContextsFunction}
     >
       <YourApp />
     </LDProvider>
@@ -216,172 +97,84 @@ function App() {
 }
 ```
 
-With Option B:
-1. The LDProvider handles the complete lifecycle:
-   - Creates client with stored level
-   - Tracks flag evaluations
-   - Handles client reinitialization when flag changes
-2. You don't need to implement any SDK log level handling
-3. Changes take effect immediately
-
 ## Usage
 
 ### Basic Logging
 
-#### Using Your Logger Instance
 ```typescript
 import { logger } from './your-logger-config';
 
-function Component() {
-  logger.fatal('Fatal error message'); // 💀
-  logger.error('Error message');       // 🔴
-  logger.warn('Warning message');      // 🟡
-  logger.info('Info message');         // 🔵
-  logger.debug('Debug message');       // ⚪
-  logger.trace('Trace message');       // 🟣
-}
-```
+// Direct usage
+logger.fatal("Application crash");  // 💀
+logger.error("API error");         // 🔴
+logger.warn("Deprecated usage");   // 🟡
+logger.info("User logged in");     // 🔵
+logger.debug("API response");      // ⚪
+logger.trace("Function called");   // 🟣
 
-#### Using with React Hook
-```typescript
-import { useLogger } from 'launchdarkly-react-logger';
+// With React hook
+import { useLogger } from '@bradbunce/launchdarkly-react-logger';
+import { logger } from './logger-config';
 
 function Component() {
-  const logger = useLogger();
+  // Hook connects logger to LaunchDarkly client
+  const logger = useLogger(logger);
   
-  logger.info('Using logger with React hook');
+  logger.info("Component mounted");
 }
 ```
 
-### Performance Measurements
+### Advanced Features
+
+#### Group Related Logs
 ```typescript
-function Component() {
-  const logger = useLogger();
-  
-  useEffect(() => {
-    logger.time('operation');
-    // Your code here
-    logger.timeEnd('operation');
-  }, []);
-}
+logger.group('API Call');
+logger.info('Starting request...');
+logger.debug('Request details:', { url, method });
+logger.groupEnd();
 ```
 
-### Grouped Logs
+#### Performance Measurements
 ```typescript
-function Component() {
-  const logger = useLogger();
-  
-  logger.group('API Call');
-  logger.info('Starting request...');
-  logger.debug('Request details:', { url, method });
-  logger.groupEnd();
-}
+logger.time('operation');
+// Your code here
+logger.timeEnd('operation');
 ```
 
-## Log Levels
-Log levels are controlled by your LaunchDarkly feature flags:
+## How It Works
 
-1. Console Log Level Flag:
-   - Controls application logging (console.log, console.error, etc.)
-   - Values: 0-5 corresponding to levels:
-     * FATAL (0)
-     * ERROR (1)
-     * WARN (2)
-     * INFO (3)
-     * DEBUG (4)
-     * TRACE (5)
-   - The flag value determines which levels are displayed
-   - Example: Setting flag to 3 (INFO) shows FATAL, ERROR, WARN, and INFO logs
-   - Evaluated on every log call
-   - Each evaluation is tracked in LaunchDarkly analytics
+1. Console Logging:
+   - Every log call checks the console log level flag
+   - Only logs at or below the flag value are shown
+   - Change the flag value to show/hide different log levels
+   - Changes take effect immediately
 
-2. SDK Log Level Flag:
-   - Controls LaunchDarkly SDK's internal logging
-   - Values: 'error', 'warn', 'info', 'debug'
-   - Important Note: The SDK's logger can only be configured during client initialization
-   
-   How it works:
-   - Option A (Using existing client):
-     * Your application must handle SDK log level changes
-     * This utility tracks flag evaluations and triggers onLogLevelChange
-     * Your application should close and reinitialize the client with the new level
-     * See Option A setup example for implementation details
-   
-   - Option B (Creating new client):
-     * This utility handles the complete process:
-       - Starts with stored level
-       - Tracks flag evaluations
-       - When flag changes to a valid level:
-         1. Stores the new level in localStorage
-         2. Closes the current client
-         3. Creates a new client with updated level
-     * Changes take effect immediately
-   
-   In both cases:
-   - Valid log levels: 'error', 'warn', 'info', 'debug'
-   - Invalid levels are ignored but still tracked in analytics
-   - All evaluations trigger onLogLevelChange callback
+2. SDK Logging:
+   - Controls LaunchDarkly's internal logging
+   - Useful for debugging flag evaluation issues
+   - Changes require client reinitialization
+   - Provider handles this automatically
 
-## Development
+## Benefits
 
-### Testing
-The project includes a comprehensive test suite that verifies:
-- Log level control through LaunchDarkly feature flags
-- All logging methods (fatal, error, warn, info, debug, trace)
-- Group and time logging functionality
-- Configuration validation
-- React hook lifecycle
-- SDK log level handling:
-  - Log level validation
-  - Local storage persistence
-  - Dynamic updates through feature flags
-  - Invalid log level handling
+1. Dynamic Control:
+   - Change log levels without deploying
+   - Perfect for debugging production issues
+   - No code changes needed
 
-To run tests:
-```bash
-npm test
-```
+2. Visual Clarity:
+   - Emoji indicators for quick level identification
+   - Grouped logging for related events
+   - Performance timing built in
 
-To run tests in watch mode:
-```bash
-npm run test:watch
-```
+3. Type Safety:
+   - Full TypeScript support
+   - Clear interfaces for configuration
+   - Compile-time checks for proper usage
 
-### Building
-To build the project:
-```bash
-npm run build
-```
-
-This will generate:
-- CommonJS build (dist/index.js)
-- ES Module build (dist/index.esm.js)
-- TypeScript declarations (dist/index.d.ts)
-
-## Contributing
-Pull requests are welcome. For major changes, please open an issue first.
-
-Please ensure tests pass and add tests for any new features.
+## Requirements
+- React ≥18.2.0
+- launchdarkly-react-client-sdk ≥3.6.0
 
 ## License
-MIT License
-
-Copyright (c) 2025 Brad Bunce
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
+MIT
