@@ -55,8 +55,18 @@ This utility provides dynamic log level control through LaunchDarkly feature fla
    ```
 
 2. Create Logger:
+   ```javascript
+   // JavaScript (logger-config.js)
+   import { Logger } from '@bradbunce/launchdarkly-react-logger';
+
+   export const logger = new Logger({
+     consoleLogFlagKey: 'your-console-flag-key',  // The number flag (0-5)
+     sdkLogFlagKey: 'your-sdk-flag-key'          // The string flag
+   });
+   ```
+
    ```typescript
-   // logger-config.ts
+   // TypeScript (logger-config.ts) - same code, with type safety
    import { Logger } from '@bradbunce/launchdarkly-react-logger';
 
    export const logger = new Logger({
@@ -66,8 +76,8 @@ This utility provides dynamic log level control through LaunchDarkly feature fla
    ```
 
 3. Connect to LaunchDarkly:
-   ```typescript
-   // App.tsx
+   ```javascript
+   // JavaScript or TypeScript (App.js/jsx/tsx)
    import { LDProvider } from '@bradbunce/launchdarkly-react-logger';
    import { LDLogLevel } from 'launchdarkly-react-client-sdk';
    import { logger } from './logger-config';
@@ -97,7 +107,8 @@ This utility provides dynamic log level control through LaunchDarkly feature fla
 
 ### Basic Logging
 
-```typescript
+```javascript
+// Works in both JavaScript and TypeScript
 import { logger } from './logger-config';
 
 // Direct usage (works outside React components)
@@ -125,7 +136,8 @@ function Component() {
 ### Advanced Features
 
 #### Group Related Logs
-```typescript
+```javascript
+// Works in both JavaScript and TypeScript
 logger.group('API Call');
 logger.info('Starting request...');
 logger.debug('Request details:', { url, method });
@@ -159,6 +171,12 @@ logger.timeEnd('operation');
 ## Requirements
 - React ≥18.2.0
 - launchdarkly-react-client-sdk ≥3.6.0
+
+## TypeScript Support
+This utility is written in TypeScript and provides type definitions out of the box. While it works perfectly in JavaScript React apps, TypeScript users get additional benefits:
+- Type checking for logger configuration
+- Autocomplete for log methods
+- Type safety for log level values
 
 ## License
 MIT
