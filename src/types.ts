@@ -2,23 +2,23 @@
 import { ReactNode, ComponentType } from 'react';
 import { LDClient } from 'launchdarkly-react-client-sdk';
 
+/**
+ * LaunchDarkly provider component type that includes access to the client
+ */
 export type LDProviderComponent = ComponentType<{ children?: ReactNode }> & {
   _client?: LDClient;
 };
 
+/**
+ * Props for the LDProvider component
+ */
 export interface LDProviderProps {
-  children?: ReactNode;
-  onReady?: () => void;
-  /** Function to create LaunchDarkly contexts. Only used when creating a new client. */
-  createContexts?: (user: any) => any;
-  /** LaunchDarkly client-side ID. Only required when creating a new client. */
-  clientSideId?: string;
-  /** Optional existing LaunchDarkly client instance. If provided, clientSideId and createContexts are ignored. */
-  existingClient?: LDProviderComponent;
-  /** Component to display while LaunchDarkly is initializing. Defaults to an empty div */
-  loadingComponent?: ReactNode;
-}
-
-export interface LoggerContextType {
-  ldClient: LDClient | null;
+  /** React children */
+  children: ReactNode;
+  /** Your LaunchDarkly client instance */
+  existingClient: LDProviderComponent;
+  /** Your SDK log level flag key */
+  sdkLogFlagKey: string;
+  /** Optional callback for SDK log level changes */
+  onLogLevelChange?: (level: string) => void;
 }
