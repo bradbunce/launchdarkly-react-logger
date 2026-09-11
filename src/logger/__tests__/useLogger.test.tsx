@@ -1,66 +1,84 @@
+import React from 'react';
 import { renderHook } from '@testing-library/react';
-import { useLDClient } from 'launchdarkly-react-client-sdk';
+import { LDReactContext } from '@launchdarkly/react-sdk';
 import { useLogger } from '../useLogger';
 import { Logger } from '../';
 
-// Mock LaunchDarkly hook
-jest.mock('launchdarkly-react-client-sdk', () => ({
-  useLDClient: jest.fn()
-}));
-
 describe('useLogger', () => {
-  let mockLDClient: any;
+  let mockLDClient: { variation: jest.Mock };
   let logger: Logger;
 
-  beforeEach(() => {
-    // Create mock client
-    mockLDClient = {
-      variation: jest.fn()
-    };
+  // Wraps the hook in the SDK's React context, as a LaunchDarkly provider would.
+  const wrapperFor = (client: unknown) => {
+    const Wrapper = ({ children }: { children: React.ReactNode }) => (
+      <LDReactContext.Provider
+        value={
+          client === null
+            ? (null as unknown as React.ContextType<typeof LDReactContext>)
+            : ({
+                client,
+                initializedState: 'success'
+              } as unknown as React.ContextType<typeof LDReactContext>)
+        }
+      >
+        {children}
+      </LDReactContext.Provider>
+    );
+    return Wrapper;
+  };
 
-    // Create logger instance
+  beforeEach(() => {
+    mockLDClient = { variation: jest.fn() };
+
     logger = new Logger({
       consoleLogFlagKey: 'test-console-flag',
       sdkLogFlagKey: 'test-sdk-flag'
     });
-
-    // Reset mocks
-    (useLDClient as jest.Mock).mockReset();
   });
 
   it('should set client when available', () => {
-    // Mock client being available
-    (useLDClient as jest.Mock).mockReturnValue(mockLDClient);
+    const setClientSpy = jest.spyOn(logger, 'setLDClient');
 
-    // Render hook with logger instance
-    renderHook(() => useLogger(logger));
+    renderHook(() => useLogger(logger), {
+      wrapper: wrapperFor(mockLDClient)
+    });
 
-    // Client should be set
-    expect(mockLDClient.variation).toBeDefined();
+    expect(setClientSpy).toHaveBeenCalledWith(mockLDClient);
+  });
+
+  it('should return the same logger instance', () => {
+    const { result } = renderHook(() => useLogger(logger), {
+      wrapper: wrapperFor(mockLDClient)
+    });
+
+    expect(result.current).toBe(logger);
+  });
+
+  it('should handle a missing provider', () => {
+    const setClientSpy = jest.spyOn(logger, 'setLDClient');
+
+    // No LaunchDarkly provider mounted at all.
+    expect(() => {
+      renderHook(() => useLogger(logger));
+    }).not.toThrow();
+
+    expect(setClientSpy).not.toHaveBeenCalled();
   });
 
   it('should handle null client', () => {
-    // Mock client not being available
-    (useLDClient as jest.Mock).mockReturnValue(null);
-
-    // Should not throw when client is null
     expect(() => {
-      renderHook(() => useLogger(logger));
+      renderHook(() => useLogger(logger), { wrapper: wrapperFor(null) });
     }).not.toThrow();
   });
 
   it('should clean up client on unmount', () => {
-    // Mock client being available
-    (useLDClient as jest.Mock).mockReturnValue(mockLDClient);
-
-    // Set up spy on logger
     const setClientSpy = jest.spyOn(logger, 'setLDClient');
 
-    // Render and unmount hook
-    const { unmount } = renderHook(() => useLogger(logger));
+    const { unmount } = renderHook(() => useLogger(logger), {
+      wrapper: wrapperFor(mockLDClient)
+    });
     unmount();
 
-    // Client should be cleared on unmount
     expect(setClientSpy).toHaveBeenCalledWith(null);
   });
 });

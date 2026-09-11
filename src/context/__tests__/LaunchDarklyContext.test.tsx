@@ -1,35 +1,47 @@
 import React from 'react';
 import { render, act } from '@testing-library/react';
+import { LDReactContext, type LDLogLevel } from '@launchdarkly/react-sdk';
 import { LDProvider } from '../LaunchDarklyContext';
-import { LDClient, LDLogLevel } from 'launchdarkly-react-client-sdk';
-import { LDProviderComponent } from '../../types';
+import type { LDProviderComponent } from '../../types';
 
 describe('LDProvider', () => {
   const mockOnLogLevelChange = jest.fn();
-  
-  type LDEventHandler = (key: string, callback: (...args: any[]) => void, context?: any) => void;
-  
-  // Create a partial mock of LDClient
-  const mockLDClient = {
-    on: jest.fn() as jest.MockedFunction<LDEventHandler>,
-  } as unknown as LDClient;
+  let mockLDClient: { on: jest.Mock; off: jest.Mock };
+  let mockProvider: LDProviderComponent;
 
-  // Create a mock provider component
-  const mockExistingClient = Object.assign(
-    function ExistingClient({ children }: { children?: React.ReactNode }) {
-      return <div data-testid="content">{children}</div>;
-    },
-    { _client: mockLDClient }
-  ) as LDProviderComponent;
+  // Returns the handler the component registered for the flag change event.
+  const getFlagChangeHandler = (): ((value: unknown) => void) | undefined => {
+    const call = mockLDClient.on.mock.calls.find(
+      ([event]) => event === 'change:sdk-log-level'
+    );
+    return call?.[1];
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
+
+    mockLDClient = { on: jest.fn(), off: jest.fn() };
+
+    // Stands in for a provider from `createLDReactProvider()`: it supplies the
+    // LaunchDarkly client on the SDK's React context.
+    mockProvider = ({ children }) => (
+      <LDReactContext.Provider
+        value={
+          {
+            client: mockLDClient,
+            initializedState: 'success'
+          } as unknown as React.ContextType<typeof LDReactContext>
+        }
+      >
+        <div data-testid="content">{children}</div>
+      </LDReactContext.Provider>
+    );
   });
 
-  it('should render children using existing client', () => {
-    const { getByTestId } = render(
+  it('should render children inside the supplied provider', () => {
+    const { getByTestId, getByText } = render(
       <LDProvider
-        existingClient={mockExistingClient}
+        provider={mockProvider}
         sdkLogFlagKey="sdk-log-level"
         onLogLevelChange={mockOnLogLevelChange}
       >
@@ -38,12 +50,13 @@ describe('LDProvider', () => {
     );
 
     expect(getByTestId('content')).toBeInTheDocument();
+    expect(getByText('Test Content')).toBeInTheDocument();
   });
 
   it('should set up flag listener for SDK log level', () => {
     render(
       <LDProvider
-        existingClient={mockExistingClient}
+        provider={mockProvider}
         sdkLogFlagKey="sdk-log-level"
         onLogLevelChange={mockOnLogLevelChange}
       >
@@ -51,7 +64,6 @@ describe('LDProvider', () => {
       </LDProvider>
     );
 
-    // Verify listener was set up
     expect(mockLDClient.on).toHaveBeenCalledWith(
       'change:sdk-log-level',
       expect.any(Function)
@@ -61,7 +73,7 @@ describe('LDProvider', () => {
   it('should handle valid log level changes', async () => {
     render(
       <LDProvider
-        existingClient={mockExistingClient}
+        provider={mockProvider}
         sdkLogFlagKey="sdk-log-level"
         onLogLevelChange={mockOnLogLevelChange}
       >
@@ -69,15 +81,11 @@ describe('LDProvider', () => {
       </LDProvider>
     );
 
-    // Get the flag change handler
-    const onCalls = (mockLDClient.on as jest.MockedFunction<LDEventHandler>).mock.calls;
-    const flagChangeCall = onCalls.find((call: [string, Function, any?]) => call[0] === 'change:sdk-log-level');
-    const flagChangeHandler = flagChangeCall?.[1] as ((value: LDLogLevel) => void) | undefined;
+    const flagChangeHandler = getFlagChangeHandler();
     expect(flagChangeHandler).toBeDefined();
 
-    // Simulate valid flag change
     await act(async () => {
-      flagChangeHandler?.('warn');
+      flagChangeHandler?.('warn' satisfies LDLogLevel);
     });
 
     expect(mockOnLogLevelChange).toHaveBeenCalledWith('warn');
@@ -86,7 +94,7 @@ describe('LDProvider', () => {
   it('should ignore invalid log levels', async () => {
     render(
       <LDProvider
-        existingClient={mockExistingClient}
+        provider={mockProvider}
         sdkLogFlagKey="sdk-log-level"
         onLogLevelChange={mockOnLogLevelChange}
       >
@@ -94,17 +102,33 @@ describe('LDProvider', () => {
       </LDProvider>
     );
 
-    // Get the flag change handler
-    const onCalls = (mockLDClient.on as jest.MockedFunction<LDEventHandler>).mock.calls;
-    const flagChangeCall = onCalls.find((call: [string, Function, any?]) => call[0] === 'change:sdk-log-level');
-    const flagChangeHandler = flagChangeCall?.[1] as ((value: LDLogLevel) => void) | undefined;
+    const flagChangeHandler = getFlagChangeHandler();
     expect(flagChangeHandler).toBeDefined();
 
-    // Simulate invalid flag value
     await act(async () => {
-      flagChangeHandler?.('invalid-level' as LDLogLevel);
+      flagChangeHandler?.('invalid-level');
     });
 
     expect(mockOnLogLevelChange).not.toHaveBeenCalled();
+  });
+
+  it('should remove the flag listener on unmount', () => {
+    const { unmount } = render(
+      <LDProvider
+        provider={mockProvider}
+        sdkLogFlagKey="sdk-log-level"
+        onLogLevelChange={mockOnLogLevelChange}
+      >
+        <div>Test Content</div>
+      </LDProvider>
+    );
+
+    const flagChangeHandler = getFlagChangeHandler();
+    unmount();
+
+    expect(mockLDClient.off).toHaveBeenCalledWith(
+      'change:sdk-log-level',
+      flagChangeHandler
+    );
   });
 });

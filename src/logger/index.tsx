@@ -1,5 +1,4 @@
-import { useEffect } from 'react';
-import { LDClient, useLDClient, basicLogger, LDLogLevel } from 'launchdarkly-react-client-sdk';
+import type { LDClient, LDLogLevel } from '@launchdarkly/react-sdk';
 
 export interface LoggerConfig {
   consoleLogFlagKey: string;
@@ -31,10 +30,17 @@ export enum LogLevel {
  */
 export class Logger {
   private ldClient: LDClient | null = null;
-  private readonly config: LoggerConfig;
+  private readonly loggerConfig: LoggerConfig;
 
   constructor(config: LoggerConfig) {
-    this.config = config;
+    this.loggerConfig = config;
+  }
+
+  /**
+   * The flag keys this logger was configured with
+   */
+  get config(): LoggerConfig {
+    return this.loggerConfig;
   }
 
   /**
@@ -47,7 +53,7 @@ export class Logger {
     if (!this.ldClient) {
       throw new Error('LaunchDarkly client is not initialized');
     }
-    const level = this.ldClient.variation(this.config.sdkLogFlagKey, fallback);
+    const level = this.ldClient.variation(this.loggerConfig.sdkLogFlagKey, fallback);
     if (level === null && !fallback) {
       throw new Error('SDK log level flag returned null and no fallback was provided');
     }
@@ -64,11 +70,11 @@ export class Logger {
 
   /**
    * Gets the current console log level from LaunchDarkly feature flag
-   * @returns Current LogLevel value
-   * @throws Error if REACT_APP_LD_CONSOLE_LOG_FLAG_KEY is not set
+   * @returns Current LogLevel value, falling back to ERROR when no client is
+   *   attached or the flag is unavailable
    */
   private getCurrentLogLevel(): LogLevel {
-    return this.ldClient?.variation(this.config.consoleLogFlagKey, LogLevel.ERROR) ?? LogLevel.ERROR;
+    return this.ldClient?.variation(this.loggerConfig.consoleLogFlagKey, LogLevel.ERROR) ?? LogLevel.ERROR;
   }
 
   /**

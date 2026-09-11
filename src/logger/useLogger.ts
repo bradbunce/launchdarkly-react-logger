@@ -1,15 +1,21 @@
 import { useEffect } from 'react';
-import { useLDClient } from 'launchdarkly-react-client-sdk';
+import type { LDReactClientContext } from '@launchdarkly/react-sdk';
+import { useOptionalLDClient } from '../context/useOptionalLDClient';
 import { Logger } from './index';
 
 /**
  * React hook for accessing a Logger instance
  * Automatically manages LaunchDarkly client lifecycle
  * @param logger - The Logger instance to use
+ * @param reactContext - Optional custom LaunchDarkly React context, for apps
+ *   that run more than one LaunchDarkly client
  * @returns The same Logger instance with client management
  */
-export const useLogger = (logger: Logger): Logger => {
-  const ldClient = useLDClient();
+export const useLogger = (
+  logger: Logger,
+  reactContext?: LDReactClientContext
+): Logger => {
+  const ldClient = useOptionalLDClient(reactContext);
 
   useEffect(() => {
     if (!ldClient) return;

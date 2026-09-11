@@ -3,23 +3,25 @@ import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import peerDepsExternal from 'rollup-plugin-peer-deps-external';
 import terser from '@rollup/plugin-terser';
-import replace from '@rollup/plugin-replace';
 import dts from 'rollup-plugin-dts';
-import { readFileSync } from 'fs';
 
-const packageJson = JSON.parse(readFileSync('./package.json'));
+const input = 'src/index.tsx';
+
+// Peer dependencies (and their subpaths) are never bundled.
+const external = [/^react(\/.*)?$/, /^react-dom(\/.*)?$/, /^@launchdarkly\/.*/];
 
 export default [
   {
-    input: 'src/index.tsx',
+    input,
     output: [
       {
-        file: packageJson.main,
+        file: './dist/index.cjs',
         format: 'cjs',
-        sourcemap: true
+        sourcemap: true,
+        exports: 'named'
       },
       {
-        file: packageJson.module,
+        file: './dist/index.js',
         format: 'esm',
         sourcemap: true
       }
@@ -28,15 +30,21 @@ export default [
       peerDepsExternal(),
       resolve(),
       commonjs(),
-      replace({
-        preventAssignment: true,
-        values: {
-          'process.env': 'undefined'
-        }
+      typescript({
+        tsconfig: './tsconfig.json',
+        // Declarations are bundled separately by rollup-plugin-dts below.
+        declaration: false,
+        declarationDir: undefined,
+        exclude: ['**/__tests__/**', '**/*.test.*', 'src/setupTests.ts']
       }),
-      typescript({ tsconfig: './tsconfig.json' }),
       terser()
     ],
-    external: ['react', 'react-dom', 'launchdarkly-react-client-sdk']
+    external
+  },
+  {
+    input,
+    output: { file: './dist/index.d.ts', format: 'es' },
+    plugins: [dts()],
+    external
   }
 ];

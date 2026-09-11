@@ -1,4 +1,4 @@
-import { LDClient, LDLogLevel } from 'launchdarkly-js-client-sdk';
+import type { LDClient, LDLogLevel } from '@launchdarkly/react-sdk';
 import { Logger, LogLevel } from '../';
 
 /**
