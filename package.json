@@ -1,6 +1,6 @@
 {
   "name": "@bradbunce/launchdarkly-react-logger",
-  "version": "2.0.0",
+  "version": "2.0.1-rc.0",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -37,7 +37,8 @@
     "dist"
   ],
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "tag": "rc"
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",
