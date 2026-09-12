@@ -46,4 +46,17 @@ jobs:
           # No dependency cache in a release build.
           registry-url: https://registry.npmjs.org/
       - run: npm ci
-      - run: npm publish --access public
+      # Staged publishing needs npm >= 11.15.0. Node 24 currently bundles
+      # 11.19.0, but 24.17 shipped 11.13.0 — self-heal rather than fail with a
+      # confusing "unknown command: stage".
+      - name: Ensure npm supports staged publishing
+        run: |
+          V=$(npm --version); echo "npm $V"
+          node -e 'const [a,b]=process.argv[1].split(".").map(Number); process.exit(a>11||(a===11&&b>=15)?0:1)' "$V" \
+            || npm i -g npm@latest
+      # Stage, do not publish: this uploads the tarball to a staging area and
+      # waits for a maintainer to approve it with 2FA. `npm stage publish` is
+      # always permitted for a trusted publisher, so the "Allow npm publish"
+      # box on npmjs.com stays unchecked. Access level comes from
+      # publishConfig.access in package.json.
+      - run: npm stage publish
