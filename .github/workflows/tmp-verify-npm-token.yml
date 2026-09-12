@@ -1,6 +1,5 @@
 name: TEMP verify npm token
-# Temporary, manual-only. Proves NPM_TOKEN authenticates against the registry
-# using the same mechanism as the publish job. Publishes nothing. Delete after.
+# Temporary, manual-only. Publishes nothing. Delete after.
 on:
   workflow_dispatch:
 
@@ -15,13 +14,31 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-          # Same as the publish job: this is what writes the token into .npmrc.
           registry-url: https://registry.npmjs.org/
-      - name: whoami
+      - name: npm whoami (direct - must fail loudly)
+        id: whoami
+        continue-on-error: true
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: echo "authenticated as -> $(npm whoami)"
-      - name: package access
+        run: npm whoami
+      - name: token shape (no value printed)
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm access get status @bradbunce/launchdarkly-react-logger
+        run: |
+          T="$NODE_AUTH_TOKEN"
+          S=$(printf '%s' "$T" | tr -d '[:space:]')
+          echo "raw length: ${#T}"
+          echo "length with whitespace stripped: ${#S}"
+          case "$T" in
+            npm_*) echo "prefix: npm_ (granular or modern classic)" ;;
+            *)     echo "prefix: none (uuid-style classic)" ;;
+          esac
+      - name: raw registry response
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          curl -sS -H "Authorization: Bearer $NODE_AUTH_TOKEN" \
+            -w '\nHTTP %{http_code}\n' https://registry.npmjs.org/-/whoami
+      - name: fail if whoami failed
+        if: steps.whoami.outcome != 'success'
+        run: echo "::error::NPM_TOKEN did not authenticate" && exit 1
