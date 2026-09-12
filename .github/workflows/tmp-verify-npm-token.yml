@@ -1,0 +1,27 @@
+name: TEMP verify npm token
+# Temporary, manual-only. Proves NPM_TOKEN authenticates against the registry
+# using the same mechanism as the publish job. Publishes nothing. Delete after.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          # Same as the publish job: this is what writes the token into .npmrc.
+          registry-url: https://registry.npmjs.org/
+      - name: whoami
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: echo "authenticated as -> $(npm whoami)"
+      - name: package access
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm access get status @bradbunce/launchdarkly-react-logger
